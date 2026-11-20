@@ -53,3 +53,7 @@ Default auto quality uses a smoothed frame interval, a bounded resolution range 
 ## 1.3 — free interactions
 
 Original project code adds NPC vehicle takeover, cooldown-limited wanted heat, road-routed police pursuit, search/escape/interception and pedestrian flee reactions. No new assets or dependencies. Taken vehicles reuse the owned slot for the same type; normal session saving therefore captures their position. NPC populations and wanted state restart on reload. Pursuers remain an arcade approximation without rigid-body responses, off-road search, aircraft or boat units. Seven additional checks bring the total to 42, including a two-minute pursuit road/land check.
+
+## 1.4 — visual presentation
+
+All new surface/sky/contact-shadow textures, environment cubemap imagery, street dressing and character geometry are original procedural project code in `src/visuals.js`, `src/world.js`, `src/vehicles.js` and `src/asset-vehicles.js`. No additional third-party assets or libraries are introduced. The pinned Kenney conversion inputs and hashes are unchanged. Reflections use Three.js PMREM on generated cubemap faces and are rebuilt only for lighting changes. Browser verification uses the limited Canvas renderer; WebGL texture/normal/reflection output and phone frame rate remain unverified on actual hardware.

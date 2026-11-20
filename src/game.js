@@ -18,6 +18,7 @@ import { makeVehicle, makePerson } from "./vehicles.js";
 import { createInput } from "./input.js";
 import { SoftwareRenderer } from "./software-renderer.js";
 import { createInteractions, takeTrafficCar } from "./interactions.js";
+import { createAtmosphere } from "./visuals.js";
 import { createTraffic } from "./traffic.js";
 import { createEffects } from "./effects.js";
 import { loadVehicleAssets, upgradeVehicle } from "./asset-vehicles.js";
@@ -48,16 +49,17 @@ try {
 }
 renderer.outputColorSpace = T.SRGBColorSpace;
 renderer.toneMapping = T.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.24;
+renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.type = T.PCFSoftShadowMap;
 const scene = new T.Scene();
 scene.background = new T.Color(0xb9c7c2);
-scene.fog = new T.Fog(0xb9c7c2, 360, 1400);
+scene.fog = new T.Fog(0xc8c7bd, 160, 1050);
+const atmosphere=createAtmosphere(scene,renderer);
 const camera = new T.PerspectiveCamera(58, 1, 0.2, 3000);
 const hemi = new T.HemisphereLight(0xd6ecf0, 0xb09a78, 2.5);
 scene.add(hemi);
 const sun = new T.DirectionalLight(0xffd4a5, 3.0);
-sun.position.set(-130, 180, 130);
+sun.position.set(-130, 100, 130);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 sun.shadow.camera.left = -100;
@@ -493,11 +495,13 @@ $("#quality").onchange = (e) => {
 $("#daytime").onchange = (e) => {
   daytime = e.target.value;
   const themes = {
-    sunset: [0xb9c7c2, 0xd6ecf0, 0xb09a78, 0xffd4a5, 2.5, 3, 1.24],
+    sunset: [0xd5bda6, 0xc1d7ed, 0x7c6855, 0xffcca0, 1.8, 3.5, 1.05],
     day: [0x9ccfe0, 0xc6e9ff, 0x9aab83, 0xfff5dd, 2.8, 3.2, 1.2],
     night: [0x263d5b, 0x6d9bcb, 0x273944, 0x90b4da, 1.0, 1.1, 1.15],
   };
   const [sky, hi, lo, sc, h, s, exposure] = themes[daytime];
+  atmosphere.setTime(daytime);
+  world.setTime(daytime);
   scene.background.set(sky);
   scene.fog.color.set(sky);
   hemi.color.set(hi);
@@ -509,6 +513,7 @@ $("#daytime").onchange = (e) => {
   sunDisc.visible = daytime !== "night";
   sceneDirty = true;
 };
+$("#daytime").onchange({target:{value:daytime}});
 $("#traffic-density").value = traffic.simulation.density;
 $("#traffic-density").onchange = (e) => {
   traffic.setDensity(e.target.value);
@@ -654,8 +659,8 @@ function updateCamera(dt, t) {
   }
   const h = active.type === "foot" ? footCameraYaw : active.heading + orbit;
   let distance =
-      spec.kind === "foot" ? 8 : fly ? 24 : spec.kind === "boat" ? 16 : 12,
-    height = fly ? 8 : spec.kind === "foot" ? 4 : 5;
+      spec.kind === "foot" ? 6 : fly ? 24 : spec.kind === "boat" ? 14 : 10,
+    height = fly ? 8 : spec.kind === "foot" ? 2.8 : 3.3;
   if (cameraMode === 1) {
     distance = fly ? 13 : spec.kind === "foot" ? 4 : 6;
     height = fly ? 4 : 2.5;
@@ -700,7 +705,7 @@ function updateCamera(dt, t) {
   smoothLook.lerp(vTarget, k);
   camera.lookAt(smoothLook);
   snapCamera = false;
-  const fov = 58 + n * 7;
+  const fov = 55 + n * 6;
   if (Math.abs(camera.fov - fov) > 0.1) {
     camera.fov = fov;
     camera.updateProjectionMatrix();
@@ -833,6 +838,7 @@ function animate(ms) {
   traffic.update(active, renderer.isSoftwareRenderer);
   effects.update(frame, active, currentControl, running);
   world.update(elapsed);
+  atmosphere.update(active);
   updateCamera(frame, elapsed);
   if (started) updateHUD(frame);
   if (running) {

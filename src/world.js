@@ -1,4 +1,5 @@
 import * as T from "../vendor/three.module.js";
+import { createSurfaceTextures } from "./visuals.js";
 import { COAST, isLand } from "./physics.js";
 
 export const DESTINATIONS = [
@@ -44,6 +45,7 @@ export function district(x, z) {
   return "城市中心 / PALM DISTRICT";
 }
 export function createWorld(scene) {
+  const surfaces=createSurfaceTextures(), nightMaterials=[];
   let seed = 188;
   const rand = () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -53,6 +55,7 @@ export function createWorld(scene) {
     batches = new Map();
   const geos = {
     box: new T.BoxGeometry(1, 1, 1),
+    shadow: new T.PlaneGeometry(1,1),
     cyl: new T.CylinderGeometry(1, 1, 1, 7),
     cone: new T.ConeGeometry(1, 1, 6),
     sphere: new T.IcosahedronGeometry(1, 0),
@@ -86,16 +89,18 @@ export function createWorld(scene) {
   const water = new T.Mesh(
     new T.PlaneGeometry(5500, 5500),
     new T.MeshStandardMaterial({
-      color: 0x398f9b,
-      roughness: 0.36,
-      metalness: 0.15,
+      color: 0x236a80,
+      roughness: 0.22,
+      metalness: 0.2,
+      normalMap: surfaces.waterNormal,
+      normalScale: new T.Vector2(.4,.4),
     }),
   );
   water.rotation.x = -Math.PI / 2;
   water.position.y = -1.18;
   scene.add(water);
   flatPoly(COAST, 0xdbcca2, -0.32, 1.045);
-  flatPoly(COAST, 0x809c76, 0);
+  flatPoly(COAST, 0x667f61, 0);
   // Shallow-water border follows the island rather than a rectangular tile.
   const shallows = flatPoly(COAST, 0x5baaa6, -1.14, 1.13);
   shallows.material.roughness = 0.85;
@@ -122,7 +127,7 @@ export function createWorld(scene) {
   }
   scene.add(waves);
   // Streets and sidewalks share a handful of instanced draw calls.
-  const roadColor = 0x3d4b51,
+  const roadColor = 0x44474a,
     curbColor = 0xc6bfa9;
   const xs = [-180, -80, 20, 120, 220],
     zs = [-350, -250, -150, -50, 50, 150, 250, 350];
@@ -192,6 +197,18 @@ export function createWorld(scene) {
           const color = colors[Math.floor(rand() * colors.length)];
           box(color, bx, h / 2, bz, w, h, d);
           colliders.push({ x: bx, z: bz, w, d, h: h + 0.2 });
+          add("shadow",0x101820,bx,.025,bz,w+10,d+10,1,0,0,-Math.PI/2);
+          // Ground-floor shopfronts and balconies break the repeated tower silhouette.
+          const front=bz+d/2+.15;
+          box(0x263f48,bx,1.65,front,w*.75,2.8,.18);
+          box(0xd8d4c6,bx,1.65,front+.12,.18,2.8,.12);
+          box(x===170?0x237e82:0xb66a4e,bx,3.4,front+.8,w*.85,.3,2);
+          box(0xf3d5a0,bx,3.9,front+.08,w*.55,.45,.12);
+          if(x===170) for(let by=6;by<h-2;by+=5) {
+            box(0xe5dfcf,bx,by,front+.7,w*.9,.22,1.7);
+            box(0x5d757b,bx,by+.65,front+1.5,w*.9,.08,.08);
+            for(const side of [-1,1]) box(0x5d757b,bx+side*w*.43,by+.35,front+1.5,.08,.7,.08);
+          }
           box(0xe4ddc9, bx, h + 0.35, bz, w + 0.7, 0.6, d + 0.7);
           const wc = windowColors[Math.floor(rand() * windowColors.length)];
           for (let y = 3; y < h - 1; y += 3.5) {
@@ -292,6 +309,22 @@ export function createWorld(scene) {
       box(0x53636b, x + 1, 8, z, 2.2, 0.15, 0.2);
       box(0xffe1a0, x + 1.7, 7.9, z, 1, 0.15, 0.6);
     }
+  // Street furniture is batched and placed on pavements, outside vehicle lanes.
+  for(const x of [-194,6,234]) for(let z=-320;z<350;z+=75) {
+    box(0x33464b,x,.65,z,1.1,1.3,.8); // bins
+    box(0x6b5441,x, .7,z+6,1.1,.18,3.2); // bench seat
+    box(0x36444a,x,.35,z+5,.8,.7,.15);
+    box(0x36444a,x,.35,z+7,.8,.7,.15);
+    box(0x6b5441,x-.45,1.15,z+6,.14,.8,3.2);
+    box(0x54636a,x,2.5,z+17,.09,5,.09);
+    box(0x24756c,x,4.4,z+17,1.7,.9,.13);
+    box(0xe7ded0,x,4.4,z+17.08,1.3,.12,.02);
+  }
+  // A low sea wall and promenade reinforce the coastal avenue.
+  for(let z=-340;z<370;z+=12) {
+    box(0xb4ad99,251,.5,z,.7,1,10);
+    box(0xe2d7bc,251,1.05,z,1,.16,10.3);
+  }
   // Distant low-poly islets and hills frame the horizon.
   for (let i = 0; i < 14; i++) {
     const x = -900 + rand() * 1800,
@@ -325,6 +358,7 @@ export function createWorld(scene) {
       new T.PlaneGeometry(w, w / 4),
       new T.MeshBasicMaterial({ map: texture, side: T.DoubleSide }),
     );
+    mesh.material.userData.fallbackColor=0x244651;
     mesh.position.set(x, y, z);
     mesh.rotation.y = ry;
     scene.add(mesh);
@@ -334,11 +368,15 @@ export function createWorld(scene) {
   sign("DAYBREAK MARINA", 285, 5.4, 169, Math.PI / 2, 15);
   // Submit static objects in batches; hundreds of buildings need few draw calls.
   for (const { kind, color, items } of batches.values()) {
-    const mesh = new T.InstancedMesh(
-      geos[kind],
-      new T.MeshStandardMaterial({ color, roughness: 0.9, flatShading: true }),
-      items.length,
-    );
+    let material=new T.MeshStandardMaterial({color,roughness:.9});
+    if(kind==="shadow") material=new T.MeshBasicMaterial({color:0xffffff,map:surfaces.shadow,transparent:true,opacity:.42,depthWrite:false});
+    else if(color===roadColor) {material.map=surfaces.asphalt;material.roughness=.96;}
+    else if(colors.includes(color) || color===curbColor) material.map=surfaces.concrete;
+    else if(windowColors.includes(color) || color===0x263f48) {
+      material.map=surfaces.glass;material.color.set(0xc5dae1);material.roughness=.23;material.metalness=.4;
+      material.emissive.set(0xe4a960);material.emissiveMap=surfaces.glass;material.emissiveIntensity=.05;nightMaterials.push(material);
+    }
+    const mesh = new T.InstancedMesh(geos[kind],material,items.length);
     for (let i = 0; i < items.length; i++) {
       const v = items[i];
       dummy.position.set(v.x, v.y, v.z);
@@ -347,7 +385,7 @@ export function createWorld(scene) {
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }
-    mesh.castShadow = kind !== "box" || items.some((v) => v.h > 2);
+    mesh.castShadow = kind !== "shadow" && items.some((v) => v.h > 2);
     mesh.receiveShadow = true;
     mesh.computeBoundingSphere();
     scene.add(mesh);
@@ -359,7 +397,7 @@ export function createWorld(scene) {
     opacity: 0.8,
   });
   for (let i = 0; i < 22; i++) {
-    const g = new T.Mesh(new T.IcosahedronGeometry(1, 1), cm);
+    const g = new T.Mesh(new T.SphereGeometry(1, 12, 6), cm);
     g.position.set(
       (rand() - 0.5) * 2500,
       160 + rand() * 90,
@@ -371,7 +409,9 @@ export function createWorld(scene) {
   scene.add(clouds);
   return {
     colliders,
+    setTime(time) {for(const m of nightMaterials)m.emissiveIntensity=time==="night"?.8:.05;},
     update(t) {
+      surfaces.waterNormal.offset.set(t*.003,t*.0015);
       waves.position.x = Math.sin(t * 0.12) * 3;
       clouds.position.x = Math.sin(t * 0.005) * 50;
     },

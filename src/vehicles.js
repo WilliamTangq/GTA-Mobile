@@ -223,16 +223,30 @@ export function makeVehicle(type) {
   root.userData = { type, ...moving };
   return root;
 }
-export function makePerson() {
-  const g = new T.Group();
-  box(g, 0.68, 0.9, 0.38, 0, 1.28, 0, 0xf5e8c9);
-  box(g, 0.43, 0.44, 0.4, 0, 1.96, 0, 0xc99473);
-  box(g, 0.46, 0.15, 0.43, 0, 2.2, -0.02, 0x182f3c);
-  const limbs = [];
-  for (const x of [-0.22, 0.22])
-    limbs.push(box(g, 0.25, 0.8, 0.28, x, 0.5, 0, 0x284553));
-  for (const x of [-0.47, 0.47])
-    limbs.push(box(g, 0.2, 0.8, 0.25, x, 1.2, 0, 0xc99473));
-  g.userData.limbs = limbs;
-  return g;
+// Shared low-resolution anatomy replaces the block figure without skeletal assets.
+const headGeometry=new T.SphereGeometry(1,10,8),
+  torsoGeometry=new T.CylinderGeometry(.3,.24,.64,10),
+  limbGeometry=new T.CapsuleGeometry(.105,.42,3,8);
+export function makePerson(variant=0) {
+  const g=new T.Group(),limbs=[];
+  const skin=[0xbe8e6b,0x8c6249,0xd3aa85][variant%3];
+  const shirt=[0xd8d4c5,0x647b88,0x805e55,0x424f53][variant%4];
+  function part(geo,color,x,y,z,sx=1,sy=1,sz=1,parent=g) {
+    const m=new T.Mesh(geo,mat(color));m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;parent.add(m);return m;
+  }
+  part(torsoGeometry,shirt,0,1.18,0,1,1,.7);
+  part(headGeometry,skin,0,1.66,0,.18,.235,.18);
+  part(headGeometry,0x252525,0,1.79,-.025,.185,.13,.175);
+  part(headGeometry,skin,0,1.66,.17,.055,.07,.05); // nose faces movement
+  for(const x of [-.14,.14]) {
+    const pivot=new T.Group();pivot.position.set(x,.89,0);g.add(pivot);limbs.push(pivot);
+    part(limbGeometry,0x31414f,0,-.32,0,1,1.12,1,pivot);
+    box(pivot,.22,.13,.35,0,-.78,.06,0x242a2f);
+  }
+  for(const x of [-.36,.36]) {
+    const pivot=new T.Group();pivot.position.set(x,1.43,0);g.add(pivot);limbs.push(pivot);
+    part(limbGeometry,shirt,0,-.16,0,.88,.58,.88,pivot);
+    part(limbGeometry,skin,0,-.43,0,.76,.6,.76,pivot);
+  }
+  g.userData.limbs=limbs;return g;
 }

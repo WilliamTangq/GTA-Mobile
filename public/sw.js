@@ -1,4 +1,4 @@
-const CACHE = "island-drive-v1.3.0";
+const CACHE = "island-drive-v1.4.0";
 const ASSETS = [
   "./",
   "./style.css",
@@ -7,6 +7,7 @@ const ASSETS = [
   "./icon-512.png",
   "./manifest.webmanifest",
   "./src/game.js",
+  "./src/visuals.js",
   "./src/interactions.js",
   "./src/controls.js",
   "./src/performance.js",

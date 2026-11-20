@@ -34,7 +34,7 @@ export class SoftwareRenderer {
     let base = this.materialCache.get(material);
     const sourceHex = material.color?.getHex();
     if (!base || base.sourceHex !== sourceHex) {
-      base = new T.Color(material.map ? 0x244651 : material.color || 0xffffff);
+      base = new T.Color(material.userData.fallbackColor ?? material.color ?? 0xffffff);
       base.convertLinearToSRGB();
       base.sourceHex = sourceHex;
       this.materialCache.set(material, base);
@@ -147,7 +147,12 @@ export class SoftwareRenderer {
       h = this.canvas.height;
     const sky = scene.background.clone().convertLinearToSRGB();
     const bg = [sky.r * 255, sky.g * 255, sky.b * 255];
-    ctx.fillStyle = `rgb(${bg.join(",")})`;
+    const skyColors=scene.userData.skyColors;
+    const gradient=ctx.createLinearGradient(0,0,0,h);
+    gradient.addColorStop(0,skyColors?.[0]||`rgb(${bg.join(",")})`);
+    gradient.addColorStop(.55,skyColors?.[2]||`rgb(${bg.join(",")})`);
+    gradient.addColorStop(1,skyColors?.[3]||`rgb(${bg.join(",")})`);
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, w, h);
     const view = camera.matrixWorldInverse.elements,
       f = h / (2 * Math.tan((camera.fov * Math.PI) / 360)),
@@ -159,7 +164,7 @@ export class SoftwareRenderer {
       matrix = new T.Matrix4(),
       temp = new T.Matrix4();
     scene.traverseVisible((mesh) => {
-      if (!mesh.isMesh || !mesh.geometry || Array.isArray(mesh.material))
+      if ((mesh.material?.map && mesh.material.transparent && mesh.material.depthWrite===false) || mesh.userData.gpuOnly || !mesh.isMesh || !mesh.geometry || Array.isArray(mesh.material))
         return;
       if (mesh.isInstancedMesh) {
         let cache = this.staticCache.get(mesh);

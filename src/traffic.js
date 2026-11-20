@@ -10,7 +10,7 @@ export function createTraffic(scene) {
   const simulation = createTrafficSimulation(),
     visuals = [];
   for (const actor of simulation.actors) {
-    const model = actor.kind === "car" ? makeVehicle(actor.type) : makePerson();
+    const model = actor.kind === "car" ? makeVehicle(actor.type) : makePerson(actor.index+1);
     scene.add(model);
     visuals.push({ actor, model });
   }

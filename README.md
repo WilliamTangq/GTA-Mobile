@@ -72,3 +72,11 @@ On foot, approach a traffic car within eight metres and press E / Enter. A waiti
 High-speed collisions near traffic cars also raise heat, with a three-second cooldown to avoid charging every physics step. One or two police cars follow axis-aligned city roads. Stars cap at three, increasing pursuit speed. Stay farther than 95 metres from all pursuers, or fly above eight metres, for 18 continuous simulation seconds to escape. A stopped player within six metres of police for three seconds is intercepted; heat clears and exploration continues without money or mission penalties. Menus freeze the simulation. Pedestrians flee nearby moving vehicles.
 
 This is an arcade interaction prototype: no driver extraction animation, weapons, combat, vehicle damage, interiors or police aircraft/boats. Pursuers use road intersections rather than navigating across terrain and do not have rigid-body collision response.
+
+## 1.4 — street-level visual upgrade
+
+Adds locally generated asphalt, concrete and window textures; a gradient sky dome; prefiltered environment reflections for vehicle paint and glass; soft contact-shadow decals; animated water normal mapping; shopfronts, coastal balconies, pavement furniture and a promenade wall. The default follow camera is lower and closer, and the overlay vignette is lighter. Shared capsule/sphere anatomy replaces block-shaped pedestrians, with shoulder/hip animation pivots and clothing variations.
+
+Textures are small and generated at startup; no new downloads, models or dependencies are required. Cube reflections update only when lighting changes, not each frame. Street objects remain instanced. Existing road geometry, spawn points and collision boundaries are preserved. New pavement furnishings and the promenade wall are decorative and do not add collision boxes.
+
+This is a stylized mobile city, not GTA 6 visual parity. The compatibility renderer displays the new geometry, camera and sky gradient, but omits texture maps, reflection filtering, normal mapping and transparent shadow decals. Browser QA therefore validates fallback startup, scene composition and settings; full GPU appearance and iPhone performance require real-device confirmation. All 42 gameplay regression checks pass.

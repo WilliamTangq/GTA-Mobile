@@ -4,9 +4,21 @@ const types = ["sport", "suv", "taxi", "police", "truck"],
   cache = new Map();
 const material = new T.MeshStandardMaterial({
   vertexColors: true,
-  roughness: 0.72,
-  metalness: 0.05,
+  roughness: 0.3,
+  metalness: 0.35,
+  envMapIntensity: 0.9,
 });
+const tireMaterial=new T.MeshStandardMaterial({vertexColors:true,roughness:.85,metalness:.05});
+let contactMap;
+function contactShadow() {
+  if(!contactMap) {
+    const c=document.createElement("canvas");c.width=c.height=64;
+    const g=c.getContext("2d"),r=g.createRadialGradient(32,32,5,32,32,32);
+    r.addColorStop(0,"rgba(0,0,0,.6)");r.addColorStop(1,"rgba(0,0,0,0)");g.fillStyle=r;g.fillRect(0,0,64,64);
+    contactMap=new T.CanvasTexture(c);
+  }
+  return new T.Mesh(new T.PlaneGeometry(3.4,6.2),new T.MeshBasicMaterial({map:contactMap,transparent:true,depthWrite:false,opacity:.65}));
+}
 function prepare(data, type) {
   const all = data.parts.flatMap((p) => p.positions),
     xs = [],
@@ -89,7 +101,7 @@ export function upgradeVehicle(root, type) {
   const wheels = [],
     steering = [];
   for (const p of parts) {
-    const mesh = new T.Mesh(p.geometry, material);
+    const mesh = new T.Mesh(p.geometry, p.name.includes("wheel")?tireMaterial:material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     if (p.name.includes("wheel")) {
@@ -129,6 +141,7 @@ export function upgradeVehicle(root, type) {
     siren.position.y = 1.25;
     body.add(siren);
   }
+  const shadow=contactShadow();shadow.rotation.x=-Math.PI/2;shadow.position.y=.145-SPECS[type].spawn[1];root.add(shadow);
   root.userData = {
     type,
     body,
