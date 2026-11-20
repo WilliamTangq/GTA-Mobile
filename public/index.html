@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1c303a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta
+      name="description"
+      content="你自己的海岛游乐场。在手机上开车、骑摩托、驾驶飞机、直升机和快艇，自由探索一座低多边形城市。"
+    />
+    <title>Island Drive — 你的海岛，自由驾驶</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <canvas id="game" aria-label="海岛三维游戏画面"></canvas>
+    <div class="vignette"></div>
+    <header id="topbar">
+      <a class="brand" href="./" aria-label="Island Drive 首页"
+        ><span class="brand-mark">id<span>.</span></span
+        ><span class="brand-type"
+          >ISLAND DRIVE<small>THE FREE ROAM CLUB</small></span
+        ></a
+      >
+      <div class="location">
+        <span class="location-dot"></span
+        ><span id="district">海岸公路 / SUNDOWN COAST</span
+        ><span class="time">17:42</span>
+      </div>
+      <nav class="top-actions" aria-label="游戏菜单">
+        <button id="garage-btn" class="garage-button" title="换载具 V">
+          <svg><use href="#i-garage" /></svg><span>换载具</span><kbd>V</kbd>
+        </button>
+        <button
+          id="sound-btn"
+          class="icon-button"
+          aria-label="开启声音"
+          title="声音"
+        >
+          <svg><use href="#i-sound" /></svg><span class="sound-slash">/</span>
+        </button>
+        <button
+          id="pause-btn"
+          class="icon-button"
+          aria-label="暂停和设置"
+          title="暂停 Esc"
+        >
+          <svg><use href="#i-pause" /></svg>
+        </button>
+      </nav>
+    </header>
+
+    <section id="intro" class="intro">
+      <div class="intro-content">
+        <div class="eyebrow"><span></span> OPEN WORLD. OPEN POSSIBILITIES.</div>
+        <h1>ISLAND<br /><em>DRIVE.</em></h1>
+        <p class="intro-sub">整座岛，都是你的游乐场。</p>
+        <p class="intro-desc">
+          开上公路，飞越城市，驶向大海。<br />没有任务，没有倒计时。想去哪，就去哪。
+        </p>
+        <button id="start-btn" class="primary-button" disabled>
+          <span id="start-label">正在准备海岛…</span
+          ><span class="button-icon">▶</span>
+        </button>
+        <div class="intro-meta">
+          <span>6 种载具</span><i></i><span>陆 · 海 · 空</span><i></i
+          ><span>触控 / 键盘</span>
+        </div>
+      </div>
+      <div class="intro-caption">
+        <span class="caption-line"></span>
+        <div>SUNDOWN COAST<small>一场说走就走的日落兜风</small></div>
+      </div>
+      <div class="intro-bottom">
+        <span>WILLIAM’S PLAYGROUND / VOL. 01</span
+        ><span
+          >建议横屏游玩 <svg><use href="#i-rotate" /></svg
+        ></span>
+      </div>
+    </section>
+
+    <main id="hud" hidden>
+      <div class="free-roam">
+        <span class="live-dot"></span>自由探索<span class="slash">/</span
+        ><span id="trip">0.00 KM</span>
+      </div>
+      <div class="side-actions">
+        <button
+          id="camera-btn"
+          class="icon-button"
+          aria-label="切换镜头"
+          title="切换镜头 C"
+        >
+          <svg><use href="#i-camera" /></svg></button
+        ><button
+          id="reset-btn"
+          class="icon-button"
+          aria-label="返回安全位置"
+          title="返回安全位置 R"
+        >
+          <svg><use href="#i-reset" /></svg>
+        </button>
+      </div>
+      <div id="toast" role="status" aria-live="polite"></div>
+      <div class="map-cluster">
+        <button id="minimap-btn" aria-label="打开地图 M">
+          <canvas id="minimap" width="300" height="300"></canvas
+          ><span class="map-expand"
+            ><svg><use href="#i-expand" /></svg
+          ></span></button
+        ><span class="map-caption"
+          >SUNDOWN ISLAND <span>MAP <kbd>M</kbd></span></span
+        >
+      </div>
+      <div class="speed-cluster">
+        <div class="vehicle-label">
+          <span id="vehicle-kind">跑车</span><span class="vehicle-line"></span
+          ><span id="vehicle-name">COMET GT</span>
+        </div>
+        <div class="speed-readout">
+          <span id="gear">N</span><span id="speed">0</span>
+          <div class="speed-unit">
+            KM/H<small id="altitude">自由驾驶</small>
+          </div>
+        </div>
+        <div class="rev-track"><div id="rev-fill"></div></div>
+        <div class="speed-footer">
+          <span><span class="live-dot"></span> FREE ROAM</span
+          ><button id="boost" data-hold="boost">BOOST <kbd>SHIFT</kbd></button>
+        </div>
+      </div>
+      <div class="keyboard-help">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 驾驶</span
+        ><span><kbd>E</kbd> 上下车</span
+        ><span class="flight-key"><kbd>Q</kbd><kbd>Z</kbd> 升降</span
+        ><span>拖动画面转动镜头</span>
+      </div>
+      <div class="touch-left">
+        <div id="stick" aria-label="方向摇杆">
+          <div class="stick-cross"></div>
+          <div id="stick-knob"><span></span></div>
+        </div>
+        <span class="control-caption">方向 / 移动</span>
+      </div>
+      <div class="touch-right">
+        <div class="flight-controls">
+          <button data-hold="rise">
+            上升 <svg><use href="#i-rise" /></svg></button
+          ><button data-hold="sink">
+            下降 <svg class="flipped"><use href="#i-rise" /></svg>
+          </button>
+        </div>
+        <div class="pedals">
+          <button class="brake-pedal" data-hold="brake">
+            <svg><use href="#i-brake" /></svg><span>刹车 / 倒退</span></button
+          ><button class="gas-pedal" data-hold="gas">
+            <svg><use href="#i-pedal" /></svg><span>加速</span>
+          </button>
+        </div>
+      </div>
+      <button id="enter-btn" class="enter-button">
+        <svg><use href="#i-exit" /></svg><span id="enter-label">下车</span
+        ><kbd>E</kbd>
+      </button>
+      <div class="portrait-hint">
+        <svg><use href="#i-rotate" /></svg> 横屏视野更开阔
+      </div>
+    </main>
+
+    <div id="garage" class="modal" hidden>
+      <section
+        class="panel garage-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="garage-title"
+      >
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">PICK YOUR NEXT ADVENTURE</span>
+            <h2 id="garage-title">今天，想怎么出发？</h2>
+          </div>
+          <button data-close class="close-button" aria-label="关闭">×</button>
+        </div>
+        <p class="panel-desc">选择载具，直接抵达适合它的出发地。</p>
+        <div id="vehicle-grid" class="vehicle-grid"></div>
+        <div class="panel-foot">
+          <span><span class="live-dot"></span>所有载具随时可用</span
+          ><span>无需解锁 · 没有付费</span>
+        </div>
+      </section>
+    </div>
+    <div id="map-modal" class="modal" hidden>
+      <section
+        class="panel map-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="map-title"
+      >
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">A LITTLE ISLAND. A LOT TO EXPLORE.</span>
+            <h2 id="map-title">下一站，哪里？</h2>
+          </div>
+          <button data-close class="close-button" aria-label="关闭">×</button>
+        </div>
+        <div class="map-layout">
+          <canvas
+            id="bigmap"
+            width="600"
+            height="600"
+            aria-label="全岛地图"
+          ></canvas>
+          <div id="destinations"></div>
+        </div>
+        <div class="panel-foot">点击目的地，快速抵达并换上相应载具。</div>
+      </section>
+    </div>
+    <div id="pause" class="modal" hidden>
+      <section
+        class="panel pause-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pause-title"
+      >
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">TAKE IT SLOW</span>
+            <h2 id="pause-title">休息一下。</h2>
+          </div>
+          <button data-close class="close-button" aria-label="关闭">×</button>
+        </div>
+        <button id="resume-btn" class="primary-button">
+          继续探索 <span>▶</span>
+        </button>
+        <div class="setting-row">
+          <span>画面质量</span
+          ><select id="quality" aria-label="画面质量">
+            <option value="low">流畅 · 推荐手机</option>
+            <option value="high">清晰 · 推荐电脑</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <span>环境时间</span
+          ><select id="daytime" aria-label="环境时间">
+            <option value="sunset">日落时分</option>
+            <option value="day">晴朗午后</option>
+            <option value="night">蓝调夜晚</option>
+          </select>
+        </div>
+        <button id="fullscreen-btn" class="secondary-button">
+          <svg><use href="#i-expand" /></svg> 全屏游玩
+        </button>
+        <div class="pause-help">
+          手机：左侧摇杆控制方向，右侧按钮加速或刹车。飞机、直升机可使用升降按钮。<br /><br />电脑：WASD
+          驾驶 · Q/Z 升降 · E 上下车 · V 换载具 · M 地图 · C 镜头 · R 复位 ·
+          Shift 加速 · Space 手刹<br /><br />iPhone 可在 Safari
+          分享菜单中选择「添加到主屏幕」。
+        </div>
+        <small class="version">ISLAND DRIVE 1.0 / 原创自由驾驶沙盒</small>
+      </section>
+    </div>
+    <div id="fatal" class="modal" hidden>
+      <section class="panel error-panel">
+        <span class="eyebrow">LET’S TRY AGAIN</span>
+        <h2>画面暂时没有加载成功</h2>
+        <p id="fatal-message">
+          请使用较新的 Safari 或 Chrome 浏览器，并刷新重试。
+        </p>
+        <button onclick="location.reload()" class="primary-button">
+          重新加载
+        </button>
+      </section>
+    </div>
+
+    <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="i-garage" viewBox="0 0 24 24">
+          <path d="M3 21V8l9-5 9 5v13M7 21V11h10v10M7 15h10M7 18h10" />
+        </symbol>
+        <symbol id="i-sound" viewBox="0 0 24 24">
+          <path
+            d="M11 4 5 9H2v6h3l6 5V4ZM15 8c3 2 3 6 0 8M18 4c6 4 6 12 0 16"
+          />
+        </symbol>
+        <symbol id="i-pause" viewBox="0 0 24 24">
+          <path d="M8 5v14M16 5v14" stroke-width="3" />
+        </symbol>
+        <symbol id="i-camera" viewBox="0 0 24 24">
+          <path d="M8 6l2-3h4l2 3h5v14H3V6h5Z" />
+          <circle cx="12" cy="13" r="4" />
+        </symbol>
+        <symbol id="i-reset" viewBox="0 0 24 24">
+          <path d="M4 10a8 8 0 1 1 0 5M4 4v6h6" />
+        </symbol>
+        <symbol id="i-expand" viewBox="0 0 24 24">
+          <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
+        </symbol>
+        <symbol id="i-rotate" viewBox="0 0 24 24">
+          <rect
+            x="7"
+            y="4"
+            width="10"
+            height="16"
+            rx="2"
+            transform="rotate(35 12 12)"
+          />
+          <path d="M2 8c0-4 3-6 6-6M22 16c0 4-3 6-6 6" />
+        </symbol>
+        <symbol id="i-rise" viewBox="0 0 24 24">
+          <path d="M5 14 12 7l7 7M12 7v13" />
+        </symbol>
+        <symbol id="i-pedal" viewBox="0 0 24 24">
+          <rect x="7" y="2" width="10" height="20" rx="3" />
+          <path d="M10 6h4m-4 4h4m-4 4h4m-4 4h4" />
+        </symbol>
+        <symbol id="i-brake" viewBox="0 0 24 24">
+          <rect x="3" y="7" width="18" height="12" rx="3" />
+          <path d="M7 10v6m5-6v6m5-6v6" />
+        </symbol>
+        <symbol id="i-exit" viewBox="0 0 24 24">
+          <path d="M14 8V3H4v18h10v-5M9 12h12m-4-4 4 4-4 4" />
+        </symbol>
+        <symbol id="i-car" viewBox="0 0 120 64">
+          <path d="m12 40 7-11 20-3 11-14h32l13 17 14 6v14H12Z" />
+          <path d="M41 26h42l-8-10H53ZM16 36h16m59 0h13M57 30v14" />
+          <circle cx="32" cy="48" r="10" />
+          <circle cx="89" cy="48" r="10" />
+        </symbol>
+        <symbol id="i-suv" viewBox="0 0 120 64">
+          <path
+            d="M11 46V24l12-12h58l13 18 16 5v16H11ZM29 16h23v15H20Zm29 0h18l10 15H58Z"
+          />
+          <circle cx="31" cy="49" r="11" />
+          <circle cx="90" cy="49" r="11" />
+          <path d="M15 39h10m73 0h9M58 35v7" />
+        </symbol>
+        <symbol id="i-bike" viewBox="0 0 120 64">
+          <circle cx="29" cy="46" r="15" />
+          <circle cx="91" cy="46" r="15" />
+          <path
+            d="m29 46 24-27 15 27H29l12-16h34l16 16-15-33H66M44 16h18M55 20l15 3M74 13l8-5"
+          />
+        </symbol>
+        <symbol id="i-plane" viewBox="0 0 120 64">
+          <path
+            d="m62 4 5 23 45 15v6l-44-8-2 15 13 5H44l13-5-2-15-45 8v-6l46-15 2-23Z"
+          />
+        </symbol>
+        <symbol id="i-heli" viewBox="0 0 120 64">
+          <path
+            d="M52 25c23-5 37 5 37 17 0 9-30 9-42 5L13 38l-4-16 8 1 4 10 26 2ZM65 25V13M30 12h75M55 52v5m25-7v7M43 58h51M14 20v25M9 30h11M73 27l8 15h-9"
+          />
+        </symbol>
+        <symbol id="i-boat" viewBox="0 0 120 64">
+          <path
+            d="m9 35 102-4-21 21H32ZM43 33l12-19h23l15 18M58 18h16l8 11H51M8 57c9 8 16-8 25 0s16-8 25 0 16-8 25 0 16-8 25 0"
+          />
+        </symbol>
+      </defs>
+    </svg>
+    <script>
+      window.addEventListener(
+        "error",
+        function (e) {
+          if (e.target && e.target.tagName === "SCRIPT") {
+            document.querySelector("#fatal").hidden = false;
+          } else if (e.message && /WebGL|context|shader/i.test(e.message)) {
+            document.querySelector("#fatal").hidden = false;
+          }
+        },
+        true,
+      );
+    </script>
+    <script type="module" src="./src/game.js"></script>
+  </body>
+</html>
