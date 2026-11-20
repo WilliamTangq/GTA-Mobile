@@ -57,12 +57,12 @@ test("YUKA traffic follows roads and stays on the island for two minutes", () =>
       }
   }
   assert.ok(
-    sim.actors.filter((a) => a.kind === "car").every((a) => a.distance > 100),
+    sim.actors.filter((a) => a.kind === "car" && !a.parked).every((a) => a.distance > 100),
   );
 });
 test("traffic slows for an obstacle ahead and resumes after it leaves", () => {
   const sim = createTrafficSimulation();
-  const a = sim.actors[0],
+  const a = sim.actors[1],
     p = a.agent.position;
   const obstacle = {
     x: p.x + Math.sin(a.heading) * 7,

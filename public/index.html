@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
+    <div id="wanted" role="status" hidden></div>
     <canvas id="game" aria-label="海岛三维游戏画面"></canvas>
     <div class="vignette"></div>
     <header id="topbar">
@@ -66,7 +67,7 @@
         <h1>ISLAND<br /><em>DRIVE.</em></h1>
         <p class="intro-sub">整座岛，都是你的游乐场。</p>
         <p class="intro-desc">
-          开上公路，飞越城市，驶向大海。<br />没有任务，没有倒计时。想去哪，就去哪。
+          开上公路，飞越城市，驶向大海。<br />自由探索，接管路边车辆，或与警察展开追逐。
         </p>
         <div class="start-actions">
           <button id="start-btn" class="primary-button" disabled>
@@ -296,12 +297,12 @@
           <svg><use href="#i-expand" /></svg> 全屏游玩
         </button>
         <div class="pause-help">
-          手机：驾驶时左摇杆只转向，右侧油门和刹车控制速度。步行时摇杆控制移动，跳跃按钮起跳。拖动画面转动镜头，双指开合缩放。飞机、直升机使用升降按钮。<br /><br />电脑：WASD
+          自由互动：下车靠近海岸边的出租车，点击「接管车辆」。抢车或高速撞到交通车辆会引来警察；拉开距离躲藏 18 秒解除通缉，停在警车旁 3 秒会被拦截。<br /><br />手机：驾驶时左摇杆只转向，右侧油门和刹车控制速度。步行时摇杆控制移动，跳跃按钮起跳。拖动画面转动镜头，双指开合缩放。飞机、直升机使用升降按钮。<br /><br />电脑：WASD
           驾驶 · Q/Z 升降 · E 上下车 · V 换载具 · M 地图 · C 镜头 · R 复位 ·
           Shift 加速 / 奔跑 · Space 手刹 / 跳跃<br /><br />iPhone 可在 Safari
           分享菜单中选择「添加到主屏幕」。
         </div>
-        <small class="version">ISLAND DRIVE 1.2 / FREE TO EXPLORE</small>
+        <small class="version">ISLAND DRIVE 1.3 / FREE TO EXPLORE</small>
       </section>
     </div>
     <div id="fatal" class="modal" hidden>

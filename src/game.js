@@ -17,6 +17,7 @@ import { createWorld, drawMap, district, DESTINATIONS } from "./world.js";
 import { makeVehicle, makePerson } from "./vehicles.js";
 import { createInput } from "./input.js";
 import { SoftwareRenderer } from "./software-renderer.js";
+import { createInteractions, takeTrafficCar } from "./interactions.js";
 import { createTraffic } from "./traffic.js";
 import { createEffects } from "./effects.js";
 import { loadVehicleAssets, upgradeVehicle } from "./asset-vehicles.js";
@@ -88,6 +89,8 @@ scene.add(person);
 person.visible = false;
 const traffic = createTraffic(scene),
   effects = createEffects(scene);
+const interactions = createInteractions();
+const pursuitModels = interactions.police.map(() => {const m=makeVehicle("police");scene.add(m);return m;});
 const parkedColliders = Object.fromEntries(
   Object.keys(states).map((t) => [
     t,
@@ -118,6 +121,7 @@ loadVehicleAssets()
     for (const [type, model] of Object.entries(models))
       upgradeVehicle(model, type);
     traffic.upgrade();
+    pursuitModels.forEach(m=>upgradeVehicle(m,"police"));
     document.body.dataset.assetModels = String(count);
   })
   .catch(() => {});
@@ -297,6 +301,19 @@ function recover() {
   clearControls();
   toast("已回到附近的安全位置");
 }
+function nearbyVehicle() {
+  let near=null,best=8;
+  for(const state of Object.values(states)) {
+    const d=Math.hypot(state.x-active.x,state.z-active.z);
+    if(d<best && state.y<3){near={state};best=d;}
+  }
+  for(const actor of traffic.simulation.actors) {
+    if(actor.kind!=="car" || !actor.enabled) continue;
+    const d=Math.hypot(actor.agent.position.x-active.x,actor.agent.position.z-active.z);
+    if(d<best){near={actor};best=d;}
+  }
+  return near;
+}
 function enterExit() {
   if (active.type !== "foot") {
     if (["plane", "heli"].includes(active.type) && active.y > 3.0) {
@@ -333,20 +350,16 @@ function enterExit() {
     );
     recovery.seed(active);
   } else {
-    let near = null,
-      best = 12;
-    for (const s of Object.values(states)) {
-      const d = Math.hypot(s.x - active.x, s.z - active.z);
-      if (d < best && s.y < 3) {
-        near = s;
-        best = d;
-      }
-    }
-    if (!near) {
-      toast("靠近一辆载具，或打开「换载具」快速出发");
-      return;
-    }
-    active = near;
+    const near=nearbyVehicle();
+    if(!near) {toast("靠近路上的车辆，按上车接管；也可以打开换载具");return;}
+    if(near.actor) {
+      const stolen=takeTrafficCar(near.actor);
+      if(!stolen) return;
+      Object.assign(states[stolen.type],stolen);
+      active=states[stolen.type];
+      interactions.report(near.actor.type==="police"?2:1);
+      recovery.seed(active);
+    } else active=near.state;
     syncMode();
     toast(`已进入 ${SPECS[active.type].name}`);
   }
@@ -729,6 +742,11 @@ function updateHUD(dt) {
           : !isRoad(active.x, active.z) && kind === "car"
             ? "草地行驶"
             : "自由驾驶";
+    const chase=interactions;
+    $("#wanted").hidden=!chase.level;
+    $("#wanted").textContent="★".repeat(chase.level)+"☆".repeat(3-chase.level)+" · "+(chase.phase==="search"?`搜索中 ${Math.ceil(18-chase.unseen)}s`:chase.arrest>0?"即将被拦截 · 加速离开":"警察追逐 · 拉开距离");
+    document.body.dataset.wanted=String(chase.level);
+    if(kind==="foot") $("#enter-label").textContent=nearbyVehicle()?.actor?"接管车辆":"上车";
     $("#jump-btn").hidden = kind !== "foot" || !isLand(active.x, active.z);
   }
   if (mapTick > 0.2) {
@@ -775,9 +793,13 @@ function animate(ms) {
     accumulator += frame;
     let recoverNeeded = false;
     while (accumulator >= 1 / 60) {
-      const before = active.distance;
+      const before = active.distance, impactSpeed=Math.abs(active.speed);
       traffic.simulation.step(1 / 60, active);
       const result = simulate(active, control, 1 / 60, simulationEnv);
+      if(result.hit && impactSpeed>5 && active.type!=="foot" && traffic.simulation.actors.some(a=>a.kind==="car" && a.enabled && Math.hypot(a.agent.position.x-active.x,a.agent.position.z-active.z)<9)) interactions.report(1);
+      const event=interactions.step(1/60,active);
+      if(event==="caught") {active.speed=0;toast("被警察拦截 · 通缉已解除，可以继续探索",3500);}
+      if(event==="escaped") toast("成功甩开警察 · 通缉已解除",3000);
       recovery.record(active, 1 / 60);
       trip += active.distance - before;
       accumulator -= 1 / 60;
@@ -801,6 +823,13 @@ function animate(ms) {
     }
   } else accumulator = 0;
   updateModels(elapsed);
+  for(const [i,p] of interactions.police.entries()) {
+    const m=pursuitModels[i];m.visible=p.enabled;
+    if(!p.enabled) continue;
+    m.position.set(p.x,p.y,p.z);m.rotation.y=p.heading;
+    for(const w of m.userData.wheels||[]) w.rotation.x=p.distance*2;
+    for(const [j,l] of (m.userData.siren?.children||[]).entries()) l.visible=Math.floor(elapsed*8+j)%2===0;
+  }
   traffic.update(active, renderer.isSoftwareRenderer);
   effects.update(frame, active, currentControl, running);
   world.update(elapsed);

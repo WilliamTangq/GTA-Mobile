@@ -121,6 +121,12 @@ export function createTrafficSimulation() {
       carTypes[i % carTypes.length],
       i,
     );
+    if(i===0) {
+      // A waiting coastal taxi makes the first free interaction easy to discover.
+      a.parked=true;a.agent.position.set(214,SPECS.taxi.spawn[1],240);
+      a.agent.velocity.set(0,0,0);a.heading=Math.PI;
+      a.collider.x=214;a.collider.z=240;
+    }
     actors.push(a);
     manager.add(a.agent);
   }
@@ -151,9 +157,9 @@ export function createTrafficSimulation() {
       this.density = ["off", "low", "high"].includes(value) ? value : "low";
       for (const a of actors) {
         a.enabled =
-          this.density !== "off" &&
+          !a.taken && this.density !== "off" &&
           (this.density === "high" || a.index < (a.kind === "car" ? 8 : 6));
-        a.agent.active = a.enabled;
+        a.agent.active = a.enabled && !a.parked;
         a.collider.enabled = a.enabled && a.kind === "car";
       }
     },
@@ -209,6 +215,14 @@ export function createTrafficSimulation() {
       manager.update(dt);
       for (const a of actors) {
         if (!a.enabled) continue;
+        if (a.kind === "person" && player && player.type !== "foot" && player.y < 3 && Math.abs(player.speed)>2) {
+          const dx=a.agent.position.x-player.x,dz=a.agent.position.z-player.z,d=Math.hypot(dx,dz);
+          a.fleeing=d<12;
+          if(d<12 && d>.01) {
+            a.agent.position.x+=dx/d*dt*4;
+            a.agent.position.z+=dz/d*dt*4;
+          }
+        } else a.fleeing=false;
         const velocity = a.agent.velocity,
           speed = velocity.length();
         if (speed > 0.05) a.heading = Math.atan2(velocity.x, velocity.z);

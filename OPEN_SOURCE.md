@@ -40,7 +40,7 @@ The upstream CC0 notice is retained at `public/assets/kenney/LICENSE.txt`. YUKA 
 
 17 Node tests cover previous vehicle behavior plus drift/grip recovery, road/shore detection, disabled collisions, nonconflicting signals, two-minute YUKA road-loop stability, obstacle slowing, density switching and model indices/hashes/wheel pivots. Syntax checks include every JS module. Browser QA uses the Canvas compatibility renderer because the cloud browser disables WebGL. Actual iPhone WebGL frame rate remains unverified.
 
-NPC behavior is intentionally simple. Cross traffic at unsignalled junctions is approximate, NPC cars cannot be stolen, the police car does not start a pursuit, and the game still uses arcade physics. Setting traffic to light/off is available on slower devices.
+NPC behavior is intentionally simple. Cross traffic at unsignalled junctions is approximate, The game uses arcade physics; the original release had no commandeering or pursuit. See the 1.3 changes below. Setting traffic to light/off is available on slower devices.
 
 ## 1.2 — mobile handling and session optimization
 
@@ -49,3 +49,7 @@ The upstream libraries and CC0 models above are retained. This iteration adds or
 Default auto quality uses a smoothed frame interval, a bounded resolution range and a cooldown before increasing resolution again. Explicit low/high modes are retained. This optimization does not promise a specific iPhone frame rate. Pause stops scene redraws, including water/rotor animation, until a setting or viewport changes. Empty particle pools are hidden and NPC avoidance no longer constructs a temporary target array for every vehicle on every physics step.
 
 35 automated tests pass, including regression checks for accidental braking, jump repetition, diagonal walking speed, camera-relative direction, swimming depth, invalid saves, stationary road-vehicle restore, airborne-plane restore, unavailable storage, nearby recovery and adaptive-resolution cooldowns. Real-device iPhone GPU performance and two-finger touch feel remain to be confirmed.
+
+## 1.3 — free interactions
+
+Original project code adds NPC vehicle takeover, cooldown-limited wanted heat, road-routed police pursuit, search/escape/interception and pedestrian flee reactions. No new assets or dependencies. Taken vehicles reuse the owned slot for the same type; normal session saving therefore captures their position. NPC populations and wanted state restart on reload. Pursuers remain an arcade approximation without rigid-body responses, off-road search, aircraft or boat units. Seven additional checks bring the total to 42, including a two-minute pursuit road/land check.

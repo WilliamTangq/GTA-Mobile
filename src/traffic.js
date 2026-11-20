@@ -83,7 +83,7 @@ export function createTraffic(scene) {
         m.rotation.y = a.heading;
         for (const w of m.userData.wheels || []) w.rotation.x = a.distance * 2;
         for (const [i, l] of (m.userData.limbs || []).entries())
-          l.rotation.x = Math.sin(a.distance * 1.3) * (i % 2 ? -1 : 1) * 0.45;
+          l.rotation.x = Math.sin(a.distance * (a.fleeing ? 3 : 1.3)) * (i % 2 ? -1 : 1) * 0.45;
         if (m.userData.tailMat)
           m.userData.tailMat.color.set(a.stopped ? 0xff3f2c : 0x963d36);
       }
