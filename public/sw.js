@@ -1,4 +1,4 @@
-const CACHE = "island-drive-v1.0.4";
+const CACHE = "island-drive-v1.1.0";
 const ASSETS = [
   "./",
   "./style.css",
@@ -12,6 +12,16 @@ const ASSETS = [
   "./src/vehicles.js",
   "./src/world.js",
   "./src/software-renderer.js",
+  "./src/traffic-ai.js",
+  "./src/traffic.js",
+  "./src/asset-vehicles.js",
+  "./src/effects.js",
+  "./vendor/yuka.module.js",
+  "./assets/kenney/sport.json",
+  "./assets/kenney/suv.json",
+  "./assets/kenney/taxi.json",
+  "./assets/kenney/police.json",
+  "./assets/kenney/truck.json",
   "./vendor/three.module.js",
   "./vendor/three.core.js",
 ];

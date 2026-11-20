@@ -7,11 +7,15 @@ import {
   blocked,
   clamp,
   approach,
+  isRoad,
 } from "./physics.js";
 import { createWorld, drawMap, district, DESTINATIONS } from "./world.js";
 import { makeVehicle, makePerson } from "./vehicles.js";
 import { createInput } from "./input.js";
 import { SoftwareRenderer } from "./software-renderer.js";
+import { createTraffic } from "./traffic.js";
+import { createEffects } from "./effects.js";
+import { loadVehicleAssets, upgradeVehicle } from "./asset-vehicles.js";
 
 const $ = (s) => document.querySelector(s),
   canvas = $("#game");
@@ -69,6 +73,22 @@ for (const type of Object.keys(SPECS).filter((t) => t !== "foot")) {
 const person = makePerson();
 scene.add(person);
 person.visible = false;
+const traffic = createTraffic(scene),
+  effects = createEffects(scene);
+const simulationEnv = { colliders: [...world.colliders, ...traffic.colliders] };
+let trafficDensity = "low";
+try {
+  trafficDensity = localStorage.getItem("island-traffic") || "low";
+} catch {}
+traffic.setDensity(trafficDensity);
+loadVehicleAssets()
+  .then((count) => {
+    for (const [type, model] of Object.entries(models))
+      upgradeVehicle(model, type);
+    traffic.upgrade();
+    document.body.dataset.assetModels = String(count);
+  })
+  .catch(() => {});
 let active = states.sport,
   started = false,
   menu = null,
@@ -161,6 +181,7 @@ function syncMode() {
   const s = SPECS[active.type],
     fly = ["plane", "heli"].includes(s.kind);
   document.body.classList.toggle("flying", fly);
+  document.body.classList.toggle("wheeled", ["car", "bike"].includes(s.kind));
   $("#vehicle-kind").textContent = s.label;
   $("#vehicle-name").textContent = s.name.toUpperCase();
   $("#enter-label").textContent = s.kind === "foot" ? "上车" : "下车";
@@ -304,6 +325,9 @@ const iconNames = {
   plane: "plane",
   heli: "heli",
   boat: "boat",
+  taxi: "car",
+  police: "car",
+  truck: "suv",
 };
 const locations = {
   sport: "海岸公路",
@@ -312,6 +336,9 @@ const locations = {
   plane: "海岛机场",
   heli: "直升机坪",
   boat: "日落码头",
+  taxi: "城市中心",
+  police: "城市中心",
+  truck: "城市中心",
 };
 function refreshGarage() {
   document.querySelectorAll(".vehicle-card").forEach((b) => {
@@ -365,6 +392,13 @@ $("#daytime").onchange = (e) => {
   sun.intensity = s;
   renderer.toneMappingExposure = exposure;
   sunDisc.visible = daytime !== "night";
+};
+$("#traffic-density").value = traffic.simulation.density;
+$("#traffic-density").onchange = (e) => {
+  traffic.setDensity(e.target.value);
+  try {
+    localStorage.setItem("island-traffic", e.target.value);
+  } catch {}
 };
 $("#fullscreen-btn").onclick = async () => {
   try {
@@ -451,7 +485,21 @@ function updateModels(t) {
       body.rotation.x += Math.sin(t * 1.8) * 0.02;
     }
     if (type === "bike") body.rotation.z = s.roll;
-    for (const w of model.userData.wheels) w.rotation.x = -s.distance * 2;
+    if (["car", "bike"].includes(SPECS[type].kind))
+      body.position.y =
+        Math.sin(s.distance * 2) *
+        Math.min(Math.abs(s.speed) / 15, 1) *
+        (isRoad(s.x, s.z) ? 0.006 : 0.025);
+    for (const w of model.userData.wheels) w.rotation.x = s.distance * 2;
+    for (const pivot of model.userData.steering || [])
+      pivot.rotation.y = -s.steering * 0.4;
+    if (model.userData.tailMat)
+      model.userData.tailMat.color.set(s.braking ? 0xff5438 : 0x923a33);
+    if (model.userData.siren)
+      model.userData.siren.children.forEach(
+        (m, i) =>
+          (m.visible = active === s ? Math.floor(t * 7) % 2 === i : true),
+      );
     for (const { mesh, axis } of model.userData.rotors)
       mesh.rotation[axis] =
         t * (s === active ? (active.type === "heli" ? 38 : 48) : 4);
@@ -555,7 +603,11 @@ function updateHUD(dt) {
         ? !isLand(active.x, active.z)
           ? "游泳中"
           : "步行探索"
-        : "自由驾驶";
+        : active.drift > 0.16
+          ? "漂移中"
+          : !isRoad(active.x, active.z) && kind === "car"
+            ? "草地行驶"
+            : "自由驾驶";
   }
   if (mapTick > 0.2) {
     mapTick = 0;
@@ -577,14 +629,16 @@ function animate(ms) {
   }
   elapsed += frame;
   const running = started && !menu;
+  const currentControl = running ? input.read() : {};
   collisionCool = Math.max(0, collisionCool - frame);
   if (running) {
-    const control = input.read();
+    const control = currentControl;
     accumulator += frame;
     let recoverNeeded = false;
     while (accumulator >= 1 / 60) {
       const before = active.distance;
-      const result = simulate(active, control, 1 / 60, world);
+      traffic.simulation.step(1 / 60, active);
+      const result = simulate(active, control, 1 / 60, simulationEnv);
       trip += active.distance - before;
       accumulator -= 1 / 60;
       if (result.recover) {
@@ -607,6 +661,8 @@ function animate(ms) {
     }
   } else accumulator = 0;
   updateModels(elapsed);
+  traffic.update(active, renderer.isSoftwareRenderer);
+  effects.update(frame, active, currentControl, running);
   world.update(elapsed);
   updateCamera(frame, elapsed);
   if (started) updateHUD(frame);

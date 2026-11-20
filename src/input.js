@@ -139,7 +139,7 @@ export function createInput(canvas, onAction) {
           (holds.has("sink") || keys.has("KeyZ") ? 1 : 0),
         boost:
           holds.has("boost") || keys.has("ShiftLeft") || keys.has("ShiftRight"),
-        brake: keys.has("Space"),
+        brake: keys.has("Space") || holds.has("handbrake"),
       };
     },
   };

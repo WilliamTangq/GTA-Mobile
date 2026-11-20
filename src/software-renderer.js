@@ -32,9 +32,11 @@ export class SoftwareRenderer {
   }
   color(material, normal) {
     let base = this.materialCache.get(material);
-    if (!base) {
+    const sourceHex = material.color?.getHex();
+    if (!base || base.sourceHex !== sourceHex) {
       base = new T.Color(material.map ? 0x244651 : material.color || 0xffffff);
       base.convertLinearToSRGB();
+      base.sourceHex = sourceHex;
       this.materialCache.set(material, base);
     }
     const light = material.isMeshBasicMaterial
@@ -47,8 +49,9 @@ export class SoftwareRenderer {
       Math.min(255, base.b * light * 255),
     ];
   }
-  entity(mesh, matrix) {
+  entity(mesh, matrix, instanceTint = null) {
     const ms = new T.Vector3().setFromMatrixScale(matrix);
+    if (Math.max(ms.x, ms.y, ms.z) < 0.00001) return null;
     if (
       mesh.isInstancedMesh &&
       Math.min(ms.x, ms.z) < 0.13 &&
@@ -71,6 +74,8 @@ export class SoftwareRenderer {
       b = new T.Vector3(),
       c = new T.Vector3(),
       normal = new T.Vector3();
+    const vertexColors = geo.attributes.color;
+    const tint = new T.Color();
     for (let i = 0; i < indexes.length; i += 3) {
       const ia = indexes[i] * 3,
         ib = indexes[i + 1] * 3,
@@ -79,11 +84,38 @@ export class SoftwareRenderer {
       b.fromArray(vertices, ib);
       c.fromArray(vertices, ic);
       normal.copy(b).sub(a).cross(c.clone().sub(a)).normalize();
+      const rgb = this.color(mesh.material, normal);
+      if (vertexColors && mesh.material.vertexColors) {
+        tint
+          .setRGB(
+            (vertexColors.getX(indexes[i]) +
+              vertexColors.getX(indexes[i + 1]) +
+              vertexColors.getX(indexes[i + 2])) /
+              3,
+            (vertexColors.getY(indexes[i]) +
+              vertexColors.getY(indexes[i + 1]) +
+              vertexColors.getY(indexes[i + 2])) /
+              3,
+            (vertexColors.getZ(indexes[i]) +
+              vertexColors.getZ(indexes[i + 1]) +
+              vertexColors.getZ(indexes[i + 2])) /
+              3,
+          )
+          .convertLinearToSRGB();
+        rgb[0] *= tint.r;
+        rgb[1] *= tint.g;
+        rgb[2] *= tint.b;
+      }
+      if (instanceTint) {
+        rgb[0] *= instanceTint.r;
+        rgb[1] *= instanceTint.g;
+        rgb[2] *= instanceTint.b;
+      }
       faces.push({
         a: ia,
         b: ib,
         c: ic,
-        color: this.color(mesh.material, normal),
+        color: rgb,
       });
     }
     geo.computeBoundingSphere();
@@ -131,12 +163,17 @@ export class SoftwareRenderer {
         return;
       if (mesh.isInstancedMesh) {
         let cache = this.staticCache.get(mesh);
-        if (!cache) {
+        if (!cache || mesh.userData.dynamic) {
           cache = [];
           for (let i = 0; i < mesh.count; i++) {
             mesh.getMatrixAt(i, temp);
             matrix.multiplyMatrices(mesh.matrixWorld, temp);
-            const e = this.entity(mesh, matrix);
+            const tint = mesh.instanceColor
+              ? new T.Color()
+                  .fromArray(mesh.instanceColor.array, i * 3)
+                  .convertLinearToSRGB()
+              : null;
+            const e = this.entity(mesh, matrix, tint);
             if (e) cache.push(e);
           }
           this.staticCache.set(mesh, cache);

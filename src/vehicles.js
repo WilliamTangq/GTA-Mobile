@@ -59,8 +59,8 @@ export function makeVehicle(type) {
   root.add(g);
   const c = SPECS[type].color;
   const moving = { wheels: [], rotors: [], steering: [], body: g };
-  if (type === "sport" || type === "suv") {
-    const suv = type === "suv",
+  if (["sport", "suv", "taxi", "police", "truck"].includes(type)) {
+    const suv = type === "suv" || type === "truck",
       w = suv ? 2.4 : 2.2,
       d = suv ? 4.7 : 4.5;
     box(g, w, 0.55, d, 0, 0.05, 0, c);

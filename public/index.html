@@ -29,7 +29,7 @@
       <a class="brand" href="./" aria-label="Island Drive 首页"
         ><span class="brand-mark">id<span>.</span></span
         ><span class="brand-type"
-          >ISLAND DRIVE<small>THE FREE ROAM CLUB</small></span
+          >ISLAND DRIVE<small>THE LIVING ISLAND</small></span
         ></a
       >
       <div class="location">
@@ -62,7 +62,7 @@
 
     <section id="intro" class="intro">
       <div class="intro-content">
-        <div class="eyebrow"><span></span> OPEN WORLD. OPEN POSSIBILITIES.</div>
+        <div class="eyebrow"><span></span> OPEN WORLD. LIVING ISLAND.</div>
         <h1>ISLAND<br /><em>DRIVE.</em></h1>
         <p class="intro-sub">整座岛，都是你的游乐场。</p>
         <p class="intro-desc">
@@ -73,7 +73,7 @@
           ><span class="button-icon">▶</span>
         </button>
         <div class="intro-meta">
-          <span>6 种载具</span><i></i><span>陆 · 海 · 空</span><i></i
+          <span>9 种载具</span><i></i><span>陆 · 海 · 空</span><i></i
           ><span>触控 / 键盘</span>
         </div>
       </div>
@@ -82,7 +82,7 @@
         <div>SUNDOWN COAST<small>一场说走就走的日落兜风</small></div>
       </div>
       <div class="intro-bottom">
-        <span>WILLIAM’S PLAYGROUND / VOL. 01</span
+        <span>WILLIAM’S PLAYGROUND / VOL. 02</span
         ><span
           >建议横屏游玩 <svg><use href="#i-rotate" /></svg
         ></span>
@@ -172,6 +172,14 @@
         <svg><use href="#i-exit" /></svg><span id="enter-label">下车</span
         ><kbd>E</kbd>
       </button>
+      <button
+        id="drift-btn"
+        class="drift-button"
+        data-hold="handbrake"
+        aria-label="手刹漂移"
+      >
+        手刹 <kbd>SPACE</kbd>
+      </button>
       <div class="portrait-hint">
         <svg><use href="#i-rotate" /></svg> 横屏视野更开阔
       </div>
@@ -257,6 +265,14 @@
             <option value="night">蓝调夜晚</option>
           </select>
         </div>
+        <div class="setting-row">
+          <span>城市交通</span
+          ><select id="traffic-density" aria-label="城市交通">
+            <option value="off">关闭</option>
+            <option value="low">轻量 · 推荐手机</option>
+            <option value="high">热闹 · 更多车辆路人</option>
+          </select>
+        </div>
         <button id="fullscreen-btn" class="secondary-button">
           <svg><use href="#i-expand" /></svg> 全屏游玩
         </button>
@@ -266,7 +282,9 @@
           Shift 加速 · Space 手刹<br /><br />iPhone 可在 Safari
           分享菜单中选择「添加到主屏幕」。
         </div>
-        <small class="version">ISLAND DRIVE 1.0 / 原创自由驾驶沙盒</small>
+        <small class="version"
+          >ISLAND DRIVE 1.1 / LIVING ISLAND · YUKA + KENNEY</small
+        >
       </section>
     </div>
     <div id="fatal" class="modal" hidden>

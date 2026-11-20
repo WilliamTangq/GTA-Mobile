@@ -87,6 +87,42 @@ export const SPECS = {
     spawn: [362, -0.45, 215, 0],
     color: 0xf2e7cf,
   },
+  taxi: {
+    name: "City Cab",
+    label: "出租车",
+    kind: "car",
+    max: 45,
+    accel: 12,
+    drag: 1,
+    turn: 1.55,
+    radius: 1.5,
+    spawn: [20, 0.7, -145, 0],
+    color: 0xeec957,
+  },
+  police: {
+    name: "Interceptor",
+    label: "警车",
+    kind: "car",
+    max: 64,
+    accel: 18,
+    drag: 0.9,
+    turn: 1.65,
+    radius: 1.5,
+    spawn: [120, 0.7, -250, Math.PI / 2],
+    color: 0x91b5c6,
+  },
+  truck: {
+    name: "Cargo Van",
+    label: "货车",
+    kind: "car",
+    max: 34,
+    accel: 8,
+    drag: 1.3,
+    turn: 1.1,
+    radius: 1.8,
+    spawn: [-80, 0.7, 150, Math.PI],
+    color: 0xb6cabb,
+  },
   foot: {
     name: "自由探索",
     label: "步行",
@@ -103,6 +139,23 @@ export const SPECS = {
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const approach = (v, target, rate, dt) =>
   v + (target - v) * (1 - Math.exp(-rate * dt));
+export const wrapAngle = (value) =>
+  Math.atan2(Math.sin(value), Math.cos(value));
+export function isRoad(x, z) {
+  return (
+    isLand(x, z) &&
+    ((x >= -205 &&
+      x <= 245 &&
+      [-350, -250, -150, -50, 50, 150, 250, 350].some(
+        (a) => Math.abs(z - a) < 8.5,
+      )) ||
+      (Math.abs(z) < 379 &&
+        [-180, -80, 20, 120, 220].some((a) => Math.abs(x - a) < 8.5)) ||
+      (Math.abs(x + 335) < 25 && z > -335 && z < 200) ||
+      (x > -300 && x < -235 && z > 200 && z < 275) ||
+      (x > -320 && x < -180 && Math.abs(z - 310) < 9))
+  );
+}
 export function isLand(x, z) {
   let inside = false;
   for (let i = 0, j = COAST.length - 1; i < COAST.length; j = i++) {
@@ -131,11 +184,16 @@ export function createState(type) {
     waterTime: 0,
     distance: 0,
     hit: false,
+    steering: 0,
+    travelHeading: heading,
+    drift: 0,
+    acceleration: 0,
   };
 }
 export function blocked(x, z, y, r, colliders = []) {
   return colliders.some(
     (b) =>
+      b.enabled !== false &&
       y < b.h &&
       x + r > b.x - b.w / 2 &&
       x - r < b.x + b.w / 2 &&
@@ -153,6 +211,11 @@ export function simulate(s, input, dt, env = {}) {
     climb = clamp(input.climb || 0, -1, 1);
   const ground = isLand(s.x, s.z),
     flying = kind === "plane" || kind === "heli";
+  const wheeled = kind === "car" || kind === "bike",
+    onRoad = isRoad(s.x, s.z),
+    previousSpeed = s.speed;
+  s.braking = wheeled && (input.brake || (throttle < 0 && s.speed > 1));
+  s.steering = approach(s.steering ?? 0, steer, wheeled ? 7 : 10, dt);
   if (kind === "foot") {
     const max = ground ? (input.boost ? 11 : 6) : 3;
     s.speed = approach(s.speed, throttle * max, 10, dt);
@@ -160,7 +223,7 @@ export function simulate(s, input, dt, env = {}) {
     let force = throttle * spec.accel;
     if (throttle < 0 && s.speed > 1)
       force = throttle * (kind === "plane" ? 19 : 27);
-    if (input.brake) force = -Math.sign(s.speed) * 35;
+    if (input.brake) force = -Math.sign(s.speed) * (wheeled ? 10 : 35);
     if (!throttle && !input.brake)
       force =
         -Math.sign(s.speed) *
@@ -173,10 +236,14 @@ export function simulate(s, input, dt, env = {}) {
         );
     if (input.boost && throttle > 0 && ["car", "bike", "boat"].includes(kind))
       force *= 1.35;
+    if (wheeled && !onRoad && s.type !== "suv")
+      force = force > 0 ? force * 0.65 : force;
     s.speed = clamp(
       s.speed + force * dt,
       -(flying ? 0 : spec.max * 0.28),
-      spec.max * (input.boost ? 1.17 : 1),
+      spec.max *
+        (input.boost ? 1.17 : 1) *
+        (wheeled && !onRoad && s.type !== "suv" ? 0.65 : 1),
     );
   }
   const turnFactor =
@@ -184,11 +251,34 @@ export function simulate(s, input, dt, env = {}) {
       ? 1
       : Math.min(Math.abs(s.speed) / 7, 1) * (s.speed < 0 ? -1 : 1);
   s.heading -=
-    steer *
+    s.steering *
     spec.turn *
     turnFactor *
     dt *
-    (kind === "car" ? 1 - 0.55 * Math.min(Math.abs(s.speed) / spec.max, 1) : 1);
+    (kind === "car"
+      ? (1 - 0.55 * Math.min(Math.abs(s.speed) / spec.max, 1)) *
+        (input.brake ? 1.45 : 1)
+      : 1);
+  s.acceleration = dt > 0 ? (s.speed - previousSpeed) / dt : 0;
+  if (wheeled) {
+    const grip = input.brake && Math.abs(s.speed) > 7 ? 1.5 : onRoad ? 9 : 4;
+    s.travelHeading =
+      (s.travelHeading ?? s.heading) +
+      wrapAngle(s.heading - (s.travelHeading ?? s.heading)) *
+        (1 - Math.exp(-grip * dt));
+    s.drift =
+      Math.abs(wrapAngle(s.heading - s.travelHeading)) *
+      Math.min(Math.abs(s.speed) / 10, 1);
+    s.pitch = approach(
+      s.pitch,
+      clamp(s.acceleration * 0.002, -0.045, 0.035),
+      5,
+      dt,
+    );
+  } else {
+    s.travelHeading = s.heading;
+    s.drift = 0;
+  }
   if (kind === "plane") {
     const lift = clamp((s.speed - 23) / 20, 0, 1);
     s.pitch = approach(
@@ -232,8 +322,8 @@ export function simulate(s, input, dt, env = {}) {
     dt,
   );
   const velocity = s.speed * (kind === "plane" ? Math.cos(s.pitch) : 1),
-    dx = Math.sin(s.heading) * velocity * dt,
-    dz = Math.cos(s.heading) * velocity * dt;
+    dx = Math.sin(s.travelHeading) * velocity * dt,
+    dz = Math.cos(s.travelHeading) * velocity * dt;
   const nx = s.x + dx,
     nz = s.z + dz;
   if (kind === "boat" && isLand(nx, nz)) {

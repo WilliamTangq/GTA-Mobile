@@ -1,0 +1,55 @@
+{
+  "author": "Kenney",
+  "license": "CC0-1.0",
+  "original": "https://kenney.nl/assets/car-kit",
+  "distribution": "https://github.com/Hidencod/tge-assets",
+  "revision": "f6b23734fe53679bb5b7c7b740739328f6f5231d",
+  "conversion": "Indexed geometry, wheel pivots, vertex palette colours. Positions quantized to 1/1000 source unit; colours stored in sRGB.",
+  "models": [
+    {
+      "type": "sport",
+      "file": "sport.json",
+      "source_path": "packs/car-kit/sedan-sports.glb",
+      "source_sha256": "aba8186e85d3aa828cb9af5c735f640c893315fb45662cf1eabf1ed9676fa99f",
+      "converted_sha256": "b8e5b17ded18d7a97614a2bf9c7c5ded462be351ac5bc86189c49a718fc6ead6",
+      "source_bytes": 189920,
+      "converted_bytes": 138384
+    },
+    {
+      "type": "suv",
+      "file": "suv.json",
+      "source_path": "packs/car-kit/suv-luxury.glb",
+      "source_sha256": "f0ee60ea243a36efcd83354bc468bc5ab9e9f960c5f5b4b68755f595f1b25d41",
+      "converted_sha256": "7b0b53492ac6b4d0d495787d4008b17e3d852edddb1722e24406e0f629ef867f",
+      "source_bytes": 188200,
+      "converted_bytes": 138544
+    },
+    {
+      "type": "taxi",
+      "file": "taxi.json",
+      "source_path": "packs/car-kit/taxi.glb",
+      "source_sha256": "c0ead3df92617dbca425e522003e80777cffc5f8987f664abab1363ff786704c",
+      "converted_sha256": "f66250b8898bfc481a4b17a24a2e955089346167e86cf88adcc7cd2ded0f7583",
+      "source_bytes": 187896,
+      "converted_bytes": 138091
+    },
+    {
+      "type": "police",
+      "file": "police.json",
+      "source_path": "packs/car-kit/police.glb",
+      "source_sha256": "4532aa00b8c313b0d81d81b81ea9f56dca54ee99c909f610988b00f9deaf7996",
+      "converted_sha256": "010b5ba5ced0689ae1e82a5bc609443647b5905075cb1f82b83069813fa38982",
+      "source_bytes": 207584,
+      "converted_bytes": 155021
+    },
+    {
+      "type": "truck",
+      "file": "truck.json",
+      "source_path": "packs/car-kit/delivery.glb",
+      "source_sha256": "bb7dce820c585a71c038dfa3c122788ce03ce0b5b224534bbd3de1776165b254",
+      "converted_sha256": "c478d8365b4a1220d8ccbf83df7f92f45765f64fd96efcb73da58811d6ff048b",
+      "source_bytes": 252504,
+      "converted_bytes": 188262
+    }
+  ]
+}
