@@ -1,6 +1,6 @@
 {
   "name": "island-drive",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "description": "Touch-first 3D island driving, flying and sailing sandbox",

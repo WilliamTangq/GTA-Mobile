@@ -15,6 +15,7 @@ import {
 } from "./physics.js";
 import { createWorld, drawMap, district, DESTINATIONS } from "./world.js";
 import { makeVehicle, makePerson } from "./vehicles.js";
+import { resolveCamera } from "./camera.js";
 import { createInput } from "./input.js";
 import { SoftwareRenderer } from "./software-renderer.js";
 import { createInteractions, takeTrafficCar } from "./interactions.js";
@@ -689,25 +690,21 @@ function updateCamera(dt, t) {
           : 0.8),
     active.z + Math.cos(active.heading) * (active.type === "foot" ? 0 : 4),
   );
-  // If a building is behind the player, lift the camera above its roof.
-  for (const b of world.colliders) {
-    if (
-      vPos.x > b.x - b.w / 2 - 1 &&
-      vPos.x < b.x + b.w / 2 + 1 &&
-      vPos.z > b.z - b.d / 2 - 1 &&
-      vPos.z < b.z + b.d / 2 + 1 &&
-      vPos.y < b.h + 2
-    )
-      vPos.y = b.h + 3;
-  }
-  const k = snapCamera ? 1 : 1 - Math.exp(-6 * dt);
-  camera.position.lerp(vPos, k);
-  smoothLook.lerp(vTarget, k);
+  const intendedDistance=vPos.distanceTo(vTarget);
+  const clear=resolveCamera(vTarget,vPos,world.colliders);
+  vPos.set(clear.x,clear.y,clear.z);
+  // Pull inward immediately at walls, ease outward when the view clears.
+  const obstructed=vPos.distanceTo(vTarget)<intendedDistance-.1;
+  const k=snapCamera || obstructed ? 1 : 1-Math.exp(-5*dt);
+  camera.position.lerp(vPos,k);
+  const final=resolveCamera(vTarget,camera.position,world.colliders);
+  camera.position.set(final.x,final.y,final.z);
+  smoothLook.lerp(vTarget,snapCamera?1:1-Math.exp(-9*dt));
   camera.lookAt(smoothLook);
   snapCamera = false;
   const fov = 55 + n * 6;
   if (Math.abs(camera.fov - fov) > 0.1) {
-    camera.fov = fov;
+    camera.fov = approach(camera.fov,fov,4,dt);
     camera.updateProjectionMatrix();
   }
   sun.position.set(active.x - 100, active.y + 160, active.z + 120);
@@ -752,6 +749,7 @@ function updateHUD(dt) {
     $("#wanted").textContent="★".repeat(chase.level)+"☆".repeat(3-chase.level)+" · "+(chase.phase==="search"?`搜索中 ${Math.ceil(18-chase.unseen)}s`:chase.arrest>0?"即将被拦截 · 加速离开":"警察追逐 · 拉开距离");
     document.body.dataset.wanted=String(chase.level);
     if(kind==="foot") $("#enter-label").textContent=nearbyVehicle()?.actor?"接管车辆":"上车";
+    if(kind!=="foot") $("#brake-label").textContent=active.speed>1?"刹车":active.speed<-.15?"倒退":"长按倒退";
     $("#jump-btn").hidden = kind !== "foot" || !isLand(active.x, active.z);
   }
   if (mapTick > 0.2) {

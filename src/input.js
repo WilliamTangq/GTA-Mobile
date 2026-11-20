@@ -6,7 +6,8 @@ export function createInput(canvas, onAction, getType = () => "sport") {
     cameraPointers = new Map();
   let pinchDistance = null;
   let stick = { x: 0, y: 0 },
-    stickId = null;
+    stickId = null,
+    stickOrigin = null;
   const pad = document.querySelector("#stick"),
     knob = document.querySelector("#stick-knob");
   const reset = () => {
@@ -17,6 +18,7 @@ export function createInput(canvas, onAction, getType = () => "sport") {
     pinchDistance = null;
     stick = { x: 0, y: 0 };
     stickId = null;
+    stickOrigin = null;
     knob.style.transform = "translate(0px,0px)";
     document
       .querySelectorAll(".held")
@@ -54,20 +56,22 @@ export function createInput(canvas, onAction, getType = () => "sport") {
     if (e.pointerId !== stickId) return;
     const r = pad.getBoundingClientRect(),
       radius = r.width * 0.32;
-    let x = (e.clientX - r.left - r.width / 2) / radius,
-      y = (e.clientY - r.top - r.height / 2) / radius;
+    let x = (e.clientX - stickOrigin.x) / radius,
+      y = (e.clientY - stickOrigin.y) / radius;
     const len = Math.hypot(x, y);
     if (len > 1) {
       x /= len;
       y /= len;
     }
     stick = deadZone(x, y);
-    knob.style.transform = `translate(${x * radius}px,${y * radius}px)`;
+    knob.style.transform = `translate(${x * radius+stickOrigin.x-r.left-r.width/2}px,${y * radius+stickOrigin.y-r.top-r.height/2}px)`;
   }
   pad.addEventListener("pointerdown", (e) => {
     if (stickId !== null) return;
     e.preventDefault();
     stickId = e.pointerId;
+    const r=pad.getBoundingClientRect(),inset=r.width*.25;
+    stickOrigin={x:Math.max(r.left+inset,Math.min(r.right-inset,e.clientX)),y:Math.max(r.top+inset,Math.min(r.bottom-inset,e.clientY))};
     pad.setPointerCapture(e.pointerId);
     moveStick(e);
   });
@@ -76,6 +80,7 @@ export function createInput(canvas, onAction, getType = () => "sport") {
     pad.addEventListener(event, (e) => {
       if (stickId === e.pointerId) {
         stickId = null;
+        stickOrigin = null;
         stick = { x: 0, y: 0 };
         knob.style.transform = "translate(0px,0px)";
       }

@@ -1724,3 +1724,19 @@ body.walking .walk-key {
 
 #wanted {position:fixed;top:calc(env(safe-area-inset-top, 0px) + 68px);left:50%;transform:translateX(-50%);z-index:8;background:#291c29e8;color:#ffd38a;border:1px solid #ee806b;border-radius:18px;padding:9px 16px;font-size:12px;white-space:nowrap;pointer-events:none}
 @media(max-height:450px){#wanted{top:14px;font-size:10px;padding:7px 10px}}
+
+/* Larger, firmer controls retain safe-area placement from the responsive layout. */
+@media (pointer:coarse), (max-width:1100px) {
+  .pedals button {box-shadow:inset 0 1px 0 #ffffff35,0 5px 18px #07121d55;transition:background .1s,border-color .1s;}
+  .pedals button.held {box-shadow:inset 0 2px 12px #15110e60,0 0 0 2px #ffc18e45;background:#cd8055c9;transform:translateY(2px);}
+  .pedals span,.control-caption {font-size:12px;}
+  .brake-pedal {width:76px;height:94px;}
+  .gas-pedal {width:82px;height:120px;}
+  #stick-knob {background:radial-gradient(circle at 35% 25%,#e7e5d280,#596f76b8);box-shadow:0 4px 12px #07121d65,inset 0 1px 1px #fff7;}
+  #boost {min-height:40px;min-width:64px;font-size:11px;}
+}
+@media (max-width:600px) and (orientation:portrait) {
+  .brake-pedal {width:66px;height:88px;}
+  .gas-pedal {width:74px;height:110px;}
+  .pedals {gap:12px;}
+}

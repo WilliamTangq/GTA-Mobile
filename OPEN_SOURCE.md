@@ -57,3 +57,7 @@ Original project code adds NPC vehicle takeover, cooldown-limited wanted heat, r
 ## 1.4 — visual presentation
 
 All new surface/sky/contact-shadow textures, environment cubemap imagery, street dressing and character geometry are original procedural project code in `src/visuals.js`, `src/world.js`, `src/vehicles.js` and `src/asset-vehicles.js`. No additional third-party assets or libraries are introduced. The pinned Kenney conversion inputs and hashes are unchanged. Reflections use Three.js PMREM on generated cubemap faces and are rebuilt only for lighting changes. Browser verification uses the limited Canvas renderer; WebGL texture/normal/reflection output and phone frame rate remain unverified on actual hardware.
+
+## 1.5 — input and handling
+
+Original simulation/input/camera code adds progressive road throttle, speed-sensitive grip limits, a standstill brake-to-reverse delay, reliable stationary handbraking, thumb-relative stick origins and segment/AABB follow-camera occlusion. Existing Three.js clearcoat shading is used for car paint; no new library, model or texture sources. Ten focused regression cases increase the suite to 52 tests. Mobile viewport QA covers layout and basic mouse/pointer interactions; real iPhone multitouch and GPU performance remain unverified.

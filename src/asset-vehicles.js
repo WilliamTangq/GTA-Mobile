@@ -2,11 +2,13 @@ import * as T from "../vendor/three.module.js";
 import { SPECS } from "./physics.js";
 const types = ["sport", "suv", "taxi", "police", "truck"],
   cache = new Map();
-const material = new T.MeshStandardMaterial({
+const material = new T.MeshPhysicalMaterial({
   vertexColors: true,
   roughness: 0.3,
   metalness: 0.35,
   envMapIntensity: 0.9,
+  clearcoat: .45,
+  clearcoatRoughness: .25,
 });
 const tireMaterial=new T.MeshStandardMaterial({vertexColors:true,roughness:.85,metalness:.05});
 let contactMap;
@@ -124,6 +126,11 @@ export function upgradeVehicle(root, type) {
     );
     body.add(light);
     brakeLights.push(light);
+  }
+  const headMat=new T.MeshBasicMaterial({color:0xffefcc});
+  for(const x of [-.65,.65]) {
+    const lamp=new T.Mesh(new T.BoxGeometry(.36,.12,.05),headMat);
+    lamp.position.set(x,.2,type==="truck"?2.9:type==="suv"?2.4:2.25);body.add(lamp);
   }
   const siren = type === "police" ? new T.Group() : null;
   if (siren) {

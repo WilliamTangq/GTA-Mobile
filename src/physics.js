@@ -190,6 +190,8 @@ export function createState(type) {
     travelHeading: heading,
     drift: 0,
     acceleration: 0,
+    driveThrottle: 0,
+    reverseHold: 0,
   };
 }
 export function blocked(x, z, y, r, colliders = []) {
@@ -257,7 +259,9 @@ export function simulate(s, input, dt, env = {}) {
     onRoad = isRoad(s.x, s.z),
     previousSpeed = s.speed;
   s.braking = wheeled && (input.brake || (throttle < 0 && s.speed > 1));
-  s.steering = approach(s.steering ?? 0, steer, wheeled ? 7 : 10, dt);
+  const steeringTarget=wheeled ? .45*steer+.55*steer*steer*steer : steer;
+  const steeringRate=wheeled ? (Math.abs(steer)<.01?11:8) : 10;
+  s.steering = approach(s.steering ?? 0, steeringTarget, steeringRate, dt);
   if (kind === "foot") {
     const max = ground ? (input.boost ? 11 : 6) : 3;
     s.speed = approach(
@@ -267,10 +271,17 @@ export function simulate(s, input, dt, env = {}) {
       dt,
     );
   } else {
-    let force = throttle * spec.accel;
+    // Engine response is gradual; service braking always reacts immediately.
+    s.driveThrottle=approach(s.driveThrottle??0,Math.max(0,throttle),7,dt);
+    let force = (wheeled && throttle>0 ? s.driveThrottle : throttle) * spec.accel;
+    s.reverseHold = wheeled && throttle<0 && Math.abs(s.speed)<.15 && !input.brake
+      ? (s.reverseHold||0)+dt : 0;
+    if(wheeled && throttle<0 && s.speed>=0 && s.speed<.15 && s.reverseHold<.32) {s.speed=0;force=0;}
     if (throttle < 0 && s.speed > 1)
       force = throttle * (kind === "plane" ? 19 : 27);
-    if (input.brake) force = -Math.sign(s.speed) * (wheeled ? 10 : 35);
+    if (input.brake) force = -Math.sign(s.speed) * Math.min(Math.abs(s.speed)/Math.max(dt,.001),wheeled?10:35);
+    if(wheeled && throttle<0 && s.speed>0 && s.speed+force*dt<0) force=-s.speed/Math.max(dt,.001);
+    if(wheeled && throttle>0 && s.speed<0) force=Math.min(27,-s.speed/Math.max(dt,.001));
     if (!throttle && !input.brake)
       force =
         -Math.sign(s.speed) *
@@ -293,20 +304,21 @@ export function simulate(s, input, dt, env = {}) {
         (wheeled && !onRoad && s.type !== "suv" ? 0.65 : 1),
     );
   }
+  if(wheeled && !throttle && Math.abs(s.speed)<.035) s.speed=0;
   const turnFactor =
     kind === "foot" || kind === "heli"
       ? 1
       : Math.min(Math.abs(s.speed) / 7, 1) * (s.speed < 0 ? -1 : 1);
-  if (!vectorWalk)
-    s.heading -=
-      s.steering *
-      spec.turn *
-      turnFactor *
-      dt *
-      (kind === "car"
-        ? (1 - 0.55 * Math.min(Math.abs(s.speed) / spec.max, 1)) *
-          (input.brake ? 1.45 : 1)
-        : 1);
+  if (!vectorWalk) {
+    let yawRate=s.steering*spec.turn*turnFactor*(kind==="car"
+      ? (1-.55*Math.min(Math.abs(s.speed)/spec.max,1))*(input.brake?1.45:1) : 1);
+    if(wheeled && !input.brake) {
+      // Limit lateral acceleration at speed while retaining tight slow turns.
+      const gripLimit=(onRoad?(kind==="bike"?11:8.8):5.5)/Math.max(Math.abs(s.speed),1);
+      yawRate=clamp(yawRate,-gripLimit,gripLimit);
+    }
+    s.heading-=yawRate*dt;
+  }
   s.acceleration = dt > 0 ? (s.speed - previousSpeed) / dt : 0;
   if (wheeled) {
     const grip = input.brake && Math.abs(s.speed) > 7 ? 1.5 : onRoad ? 9 : 4;
