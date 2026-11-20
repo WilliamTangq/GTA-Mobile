@@ -8,6 +8,10 @@ import {
   clamp,
   approach,
   isRoad,
+  wrapAngle,
+  FOOT_GROUND,
+  FOOT_SWIM,
+  updateParkedCollider,
 } from "./physics.js";
 import { createWorld, drawMap, district, DESTINATIONS } from "./world.js";
 import { makeVehicle, makePerson } from "./vehicles.js";
@@ -16,9 +20,18 @@ import { SoftwareRenderer } from "./software-renderer.js";
 import { createTraffic } from "./traffic.js";
 import { createEffects } from "./effects.js";
 import { loadVehicleAssets, upgradeVehicle } from "./asset-vehicles.js";
+import { createAdaptiveQuality } from "./performance.js";
+import {
+  readSession,
+  writeSession,
+  encodeSession,
+  createRecoveryTracker,
+} from "./session.js";
 
 const $ = (s) => document.querySelector(s),
   canvas = $("#game");
+let gameInput = null,
+  sceneDirty = true;
 let renderer;
 try {
   const context = canvas.getContext("webgl2", {
@@ -75,7 +88,26 @@ scene.add(person);
 person.visible = false;
 const traffic = createTraffic(scene),
   effects = createEffects(scene);
-const simulationEnv = { colliders: [...world.colliders, ...traffic.colliders] };
+const parkedColliders = Object.fromEntries(
+  Object.keys(states).map((t) => [
+    t,
+    updateParkedCollider(states[t], {}, false),
+  ]),
+);
+const simulationEnv = {
+  colliders: [
+    ...world.colliders,
+    ...traffic.colliders,
+    ...Object.values(parkedColliders),
+  ],
+};
+const recovery = createRecoveryTracker(world.colliders);
+for (const state of Object.values(states)) recovery.seed(state);
+let savedSession = null;
+try {
+  savedSession = readSession(localStorage, world.colliders);
+} catch {}
+const adaptiveQuality = createAdaptiveQuality();
 let trafficDensity = "low";
 try {
   trafficDensity = localStorage.getItem("island-traffic") || "low";
@@ -98,44 +130,78 @@ let active = states.sport,
   cameraMode = 0,
   orbit = 0,
   zoom = 1,
-  quality = "low",
+  quality = "auto",
   daytime = "sunset",
   last = 0,
   mapTick = 0,
   hudTick = 0,
   toastTimer = 0,
-  collisionCool = 0;
+  collisionCool = 0,
+  footCameraYaw = Math.PI,
+  cameraElevation = 0,
+  lastCameraGesture = 0,
+  saveTimer = 0,
+  renderCount = 0;
 const vPos = new T.Vector3(),
   vTarget = new T.Vector3(),
-  look = new T.Vector3(),
   smoothLook = new T.Vector3();
 let snapCamera = true;
 let sound = false,
   audio = null;
 try {
-  quality = localStorage.getItem("island-quality") || "low";
-  if (!["low", "high"].includes(quality)) quality = "low";
+  quality = localStorage.getItem("island-quality") || "auto";
+  if (!["auto", "low", "high"].includes(quality)) quality = "auto";
 } catch {}
 $("#quality").value = quality;
-function resize() {
+function resize(resetControls = true) {
   const w = window.innerWidth,
     h = window.innerHeight;
   renderer.setPixelRatio(
-    Math.min(devicePixelRatio || 1, quality === "high" ? 1.75 : 1.15),
+    Math.min(
+      devicePixelRatio || 1,
+      quality === "high" ? 1.75 : quality === "low" ? 1 : adaptiveQuality.scale,
+    ),
   );
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.shadowMap.enabled = quality === "high";
+  sceneDirty = true;
+  if (resetControls) gameInput?.reset();
 }
-window.addEventListener("resize", resize);
-window.visualViewport?.addEventListener("resize", resize);
+window.addEventListener("resize", () => resize());
+window.visualViewport?.addEventListener("resize", () => resize());
 resize();
 function toast(message, duration = 3800) {
   clearTimeout(toastTimer);
   $("#toast").textContent = message;
   $("#toast").classList.add("show");
   toastTimer = setTimeout(() => $("#toast").classList.remove("show"), duration);
+}
+function saveProgress() {
+  if (!started) return false;
+  let ok = false;
+  try {
+    ok = writeSession(
+      localStorage,
+      encodeSession(
+        states,
+        active,
+        trip,
+        {
+          mode: cameraMode,
+          zoom,
+          footYaw: footCameraYaw,
+          elevation: cameraElevation,
+        },
+        { daytime },
+      ),
+    );
+  } catch {}
+  $("#save-status").textContent = ok
+    ? "进度已保存在此设备"
+    : "此浏览器暂时无法保存进度";
+  return ok;
 }
 function clearControls() {
   input.reset();
@@ -156,6 +222,8 @@ function openMenu(name) {
   previousFocus = document.activeElement;
   closeMenu();
   menu = name;
+  saveProgress();
+  sceneDirty = true;
   $("#" + name).hidden = false;
   clearControls();
   if (name === "garage") refreshGarage();
@@ -182,6 +250,16 @@ function syncMode() {
     fly = ["plane", "heli"].includes(s.kind);
   document.body.classList.toggle("flying", fly);
   document.body.classList.toggle("wheeled", ["car", "bike"].includes(s.kind));
+  const walking = s.kind === "foot";
+  document.body.classList.toggle("walking", walking);
+  if (walking) footCameraYaw = wrapAngle(active.heading + orbit);
+  $("#jump-btn").hidden = !walking || !isLand(active.x, active.z);
+  $("#control-caption").textContent = walking ? "移动方向" : "转向";
+  $("#gas-label").textContent = walking ? "前进" : "加速";
+  $("#brake-label").textContent = walking ? "后退" : "刹车 / 倒退";
+  $(".keyboard-help > span:first-child").innerHTML =
+    "<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> " +
+    (walking ? "移动" : "驾驶");
   $("#vehicle-kind").textContent = s.label;
   $("#vehicle-name").textContent = s.name.toUpperCase();
   $("#enter-label").textContent = s.kind === "foot" ? "上车" : "下车";
@@ -207,14 +285,17 @@ function chooseVehicle(type, notify = true) {
 }
 function recover() {
   const type = active.type;
-  if (type === "foot") {
-    active = { ...createState("foot") };
-    syncMode();
-  } else chooseVehicle(type, false);
+  const safe = recovery.recover(active);
+  if (type === "foot") active = safe;
+  else {
+    Object.assign(states[type], safe);
+    active = states[type];
+  }
+  syncMode();
   snapCamera = true;
   orbit = 0;
   clearControls();
-  toast("已返回安全出发点");
+  toast("已回到附近的安全位置");
 }
 function enterExit() {
   if (active.type !== "foot") {
@@ -241,7 +322,7 @@ function enterExit() {
     active = {
       ...createState("foot"),
       ...p,
-      y: isLand(p.x, p.z) ? 0.25 : -0.85,
+      y: isLand(p.x, p.z) ? FOOT_GROUND : FOOT_SWIM,
       heading: old.heading,
     };
     syncMode();
@@ -250,6 +331,7 @@ function enterExit() {
         ? "已下车 · 靠近载具可以重新上车"
         : "现在可以游泳 · 靠近快艇重新上船",
     );
+    recovery.seed(active);
   } else {
     let near = null,
       best = 12;
@@ -274,11 +356,29 @@ function enterExit() {
 }
 function handleAction(name, value) {
   if (name === "orbit") {
-    if (!menu) orbit += value;
+    if (started && !menu) {
+      if (active.type === "foot")
+        footCameraYaw = wrapAngle(footCameraYaw + value);
+      else orbit = wrapAngle(orbit + value);
+      lastCameraGesture = elapsed;
+      sceneDirty = true;
+    }
+    return;
+  }
+  if (name === "look-pitch") {
+    if (started && !menu) {
+      cameraElevation = clamp(cameraElevation + value, -0.15, 1);
+      lastCameraGesture = elapsed;
+      sceneDirty = true;
+    }
     return;
   }
   if (name === "zoom") {
-    zoom = clamp(zoom + value, 0.7, 2.5);
+    if (started && !menu) {
+      zoom = clamp(zoom + value, 0.7, 2.5);
+      lastCameraGesture = elapsed;
+      sceneDirty = true;
+    }
     return;
   }
   if (!started) return;
@@ -300,11 +400,13 @@ function handleAction(name, value) {
   if (name === "camera") {
     cameraMode = (cameraMode + 1) % 3;
     orbit = 0;
+    cameraElevation = 0;
     snapCamera = true;
     toast(["跟随镜头", "贴近镜头", "俯瞰镜头"][cameraMode], 1700);
   }
 }
-const input = createInput(canvas, handleAction);
+const input = createInput(canvas, handleAction, () => active.type);
+gameInput = input;
 $("#garage-btn").onclick = () => handleAction("garage");
 $("#pause-btn").onclick = () => handleAction("pause");
 $("#minimap-btn").onclick = () => handleAction("map");
@@ -373,7 +475,7 @@ $("#quality").onchange = (e) => {
   try {
     localStorage.setItem("island-quality", quality);
   } catch {}
-  resize();
+  resize(false);
 };
 $("#daytime").onchange = (e) => {
   daytime = e.target.value;
@@ -392,6 +494,7 @@ $("#daytime").onchange = (e) => {
   sun.intensity = s;
   renderer.toneMappingExposure = exposure;
   sunDisc.visible = daytime !== "night";
+  sceneDirty = true;
 };
 $("#traffic-density").value = traffic.simulation.density;
 $("#traffic-density").onchange = (e) => {
@@ -506,13 +609,15 @@ function updateModels(t) {
   }
   if (active.type === "foot") {
     person.position.set(active.x, active.y, active.z);
-    person.rotation.y = active.heading;
+    const swimming = !isLand(active.x, active.z);
+    person.rotation.set(swimming ? -0.45 : 0, active.heading, 0, "YXZ");
     const a =
       Math.sin(active.distance * 1.3) *
       Math.min(Math.abs(active.speed) / 5, 1) *
       0.6;
     person.userData.limbs.forEach(
-      (l, i) => (l.rotation.x = a * (i % 2 ? -1 : 1)),
+      (l, i) =>
+        (l.rotation.x = a * (i % 2 ? -1 : 1) + (swimming && i > 1 ? 1.4 : 0)),
     );
   }
 }
@@ -525,8 +630,16 @@ function updateCamera(dt, t) {
     return;
   }
   const spec = SPECS[active.type],
-    fly = ["plane", "heli"].includes(spec.kind),
-    h = active.heading + orbit;
+    fly = ["plane", "heli"].includes(spec.kind);
+  if (
+    active.type !== "foot" &&
+    Math.abs(active.speed) > 3 &&
+    t - lastCameraGesture > 3
+  ) {
+    orbit = approach(orbit, 0, 1.2, dt);
+    cameraElevation = approach(cameraElevation, 0, 1.2, dt);
+  }
+  const h = active.type === "foot" ? footCameraYaw : active.heading + orbit;
   let distance =
       spec.kind === "foot" ? 8 : fly ? 24 : spec.kind === "boat" ? 16 : 12,
     height = fly ? 8 : spec.kind === "foot" ? 4 : 5;
@@ -540,15 +653,23 @@ function updateCamera(dt, t) {
   }
   const n = Math.abs(active.speed) / spec.max;
   distance = (distance + n * 3) * zoom;
+  height = Math.max(1.3, height + distance * cameraElevation);
   vPos.set(
     active.x - Math.sin(h) * distance,
     active.y + height * zoom,
     active.z - Math.cos(h) * distance,
   );
   vTarget.set(
-    active.x + Math.sin(active.heading) * 4,
-    active.y + (fly ? 1 : 0.8),
-    active.z + Math.cos(active.heading) * 4,
+    active.x + Math.sin(active.heading) * (active.type === "foot" ? 0 : 4),
+    active.y +
+      (active.type === "foot"
+        ? !isLand(active.x, active.z)
+          ? 1.9
+          : 1.15
+        : fly
+          ? 1
+          : 0.8),
+    active.z + Math.cos(active.heading) * (active.type === "foot" ? 0 : 4),
   );
   // If a building is behind the player, lift the camera above its roof.
   for (const b of world.colliders) {
@@ -608,6 +729,7 @@ function updateHUD(dt) {
           : !isRoad(active.x, active.z) && kind === "car"
             ? "草地行驶"
             : "自由驾驶";
+    $("#jump-btn").hidden = kind !== "foot" || !isLand(active.x, active.z);
   }
   if (mapTick > 0.2) {
     mapTick = 0;
@@ -615,6 +737,7 @@ function updateHUD(dt) {
   }
 }
 let accumulator = 0;
+let fpsMs = 40;
 function animate(ms) {
   if (!last) last = ms;
   const frame = clamp(
@@ -627,11 +750,27 @@ function animate(ms) {
     updateAudio();
     return;
   }
-  elapsed += frame;
+  if (started && menu && !sceneDirty) {
+    updateAudio();
+    return;
+  }
+  if (!menu) elapsed += frame;
   const running = started && !menu;
   const currentControl = running ? input.read() : {};
+  if (active.type === "foot") currentControl.cameraHeading = footCameraYaw;
+  if (running && frame > 0) {
+    fpsMs += (frame * 1000 - fpsMs) * 0.05;
+    if (
+      !renderer.isSoftwareRenderer &&
+      adaptiveQuality.sample(frame * 1000) &&
+      quality === "auto"
+    )
+      resize(false);
+  }
   collisionCool = Math.max(0, collisionCool - frame);
   if (running) {
+    for (const [type, state] of Object.entries(states))
+      updateParkedCollider(state, parkedColliders[type], state !== active);
     const control = currentControl;
     accumulator += frame;
     let recoverNeeded = false;
@@ -639,6 +778,7 @@ function animate(ms) {
       const before = active.distance;
       traffic.simulation.step(1 / 60, active);
       const result = simulate(active, control, 1 / 60, simulationEnv);
+      recovery.record(active, 1 / 60);
       trip += active.distance - before;
       accumulator -= 1 / 60;
       if (result.recover) {
@@ -666,6 +806,15 @@ function animate(ms) {
   world.update(elapsed);
   updateCamera(frame, elapsed);
   if (started) updateHUD(frame);
+  if (running) {
+    saveTimer += frame;
+    if (saveTimer >= 5) {
+      saveTimer = 0;
+      saveProgress();
+    }
+  }
+  $("#performance-status").textContent =
+    `游玩 ${Math.round(1000 / Math.max(fpsMs, 1))} FPS · ${quality === "auto" ? "自动画质" : quality === "low" ? "流畅画质" : "清晰画质"}`;
   updateAudio();
   const renderStart = performance.now();
   renderer.render(scene, camera);
@@ -673,6 +822,8 @@ function animate(ms) {
   document.body.dataset.renderer = renderer.isSoftwareRenderer
     ? "software"
     : "webgl";
+  document.body.dataset.renderCount = String(++renderCount);
+  sceneDirty = false;
 }
 renderer.setAnimationLoop(animate);
 canvas.addEventListener("webglcontextlost", (e) => {
@@ -683,23 +834,56 @@ canvas.addEventListener("webglcontextlost", (e) => {
 });
 document.addEventListener("visibilitychange", () => {
   last = 0;
-  if (document.hidden && started && !menu) openMenu("pause");
+  if (document.hidden && started) {
+    saveProgress();
+    if (!menu) openMenu("pause");
+  }
 });
-$("#start-btn").onclick = () => {
+window.addEventListener("pagehide", saveProgress);
+function beginExploration(resume) {
+  const restored = resume ? savedSession : null;
+  if (restored) {
+    for (const [type, state] of Object.entries(restored.states))
+      Object.assign(states[type], state);
+    active =
+      restored.active.type === "foot"
+        ? restored.active
+        : states[restored.active.type];
+    trip = restored.trip;
+    cameraMode = restored.camera.mode;
+    zoom = restored.camera.zoom;
+    cameraElevation = restored.camera.elevation;
+    daytime = restored.settings.daytime;
+    $("#daytime").value = daytime;
+    $("#daytime").onchange({ target: { value: daytime } });
+  }
   started = true;
   $("#intro").hidden = true;
   $("#hud").hidden = false;
   syncMode();
+  if (restored?.active.type === "foot") footCameraYaw = restored.camera.footYaw;
+  for (const state of Object.values(states)) recovery.seed(state);
+  recovery.seed(active);
   snapCamera = true;
   clearControls();
+  saveProgress();
+  sceneDirty = true;
   toast(
-    renderer.isSoftwareRenderer
-      ? "已启用兼容画面 · 随时点「换载具」探索陆海空"
-      : "欢迎来到你的海岛 · 左侧转向，右侧加速 · 随时点「换载具」",
+    restored
+      ? "已继续上次探索 · 镜头支持拖动与双指缩放"
+      : renderer.isSoftwareRenderer
+        ? "已启用兼容画面 · 随时点「换载具」探索陆海空"
+        : "欢迎来到你的海岛 · 左侧转向，右侧加速 · 随时点「换载具」",
     6000,
   );
+}
+$("#start-btn").onclick = () => beginExploration(!!savedSession);
+$("#new-session-btn").onclick = () => {
+  savedSession = null;
+  beginExploration(false);
 };
-$("#start-label").textContent = "开始自由探索";
+$("#new-session-btn").hidden = !savedSession;
+$("#start-label").textContent = savedSession ? "继续上次探索" : "开始自由探索";
 $("#start-btn").disabled = false;
 syncMode();
 updateModels(0);

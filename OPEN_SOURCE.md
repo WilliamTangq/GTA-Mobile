@@ -1,4 +1,4 @@
-# Living Island 1.1 — open-source upgrades
+# Living Island — open-source integration and optimization notes
 
 This release integrates upstream software and assets directly. Game-specific traffic rules, touch controls, drift simulation, mesh conversion, lighting integration and effects are original code in this repository.
 
@@ -41,3 +41,11 @@ The upstream CC0 notice is retained at `public/assets/kenney/LICENSE.txt`. YUKA 
 17 Node tests cover previous vehicle behavior plus drift/grip recovery, road/shore detection, disabled collisions, nonconflicting signals, two-minute YUKA road-loop stability, obstacle slowing, density switching and model indices/hashes/wheel pivots. Syntax checks include every JS module. Browser QA uses the Canvas compatibility renderer because the cloud browser disables WebGL. Actual iPhone WebGL frame rate remains unverified.
 
 NPC behavior is intentionally simple. Cross traffic at unsignalled junctions is approximate, NPC cars cannot be stolen, the police car does not start a pursuit, and the game still uses arcade physics. Setting traffic to light/off is available on slower devices.
+
+## 1.2 — mobile handling and session optimization
+
+The upstream libraries and CC0 models above are retained. This iteration adds original game code for camera-relative walking and jumping, steering/pedal separation, joystick dead zones, pointer-cancel cleanup, pinch/elevation gestures, driving camera recentering, validated local session restore and recent safe-position recovery. Road vehicles restore stopped; an airborne plane retains its airspeed.
+
+Default auto quality uses a smoothed frame interval, a bounded resolution range and a cooldown before increasing resolution again. Explicit low/high modes are retained. This optimization does not promise a specific iPhone frame rate. Pause stops scene redraws, including water/rotor animation, until a setting or viewport changes. Empty particle pools are hidden and NPC avoidance no longer constructs a temporary target array for every vehicle on every physics step.
+
+35 automated tests pass, including regression checks for accidental braking, jump repetition, diagonal walking speed, camera-relative direction, swimming depth, invalid saves, stationary road-vehicle restore, airborne-plane restore, unavailable storage, nearby recovery and adaptive-resolution cooldowns. Real-device iPhone GPU performance and two-finger touch feel remain to be confirmed.

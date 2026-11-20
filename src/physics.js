@@ -1,4 +1,6 @@
 // Pure simulation: metres, seconds, radians. Models face local +Z.
+export const FOOT_GROUND = 0.02,
+  FOOT_SWIM = -2.65;
 export const COAST = [
   [-450, -500],
   [-220, -570],
@@ -201,6 +203,29 @@ export function blocked(x, z, y, r, colliders = []) {
       z - r < b.z + b.d / 2,
   );
 }
+export function updateParkedCollider(s, out = {}, enabled = true) {
+  const dimensions =
+    s.type === "plane"
+      ? [11.5, 8]
+      : s.type === "heli"
+        ? [3, 7]
+        : s.type === "boat"
+          ? [3.4, 7]
+          : s.type === "bike"
+            ? [0.8, 2.6]
+            : s.type === "truck"
+              ? [2.6, 5.8]
+              : [2.4, 4.8];
+  const c = Math.abs(Math.cos(s.heading)),
+    n = Math.abs(Math.sin(s.heading));
+  out.x = s.x;
+  out.z = s.z;
+  out.w = dimensions[0] * c + dimensions[1] * n;
+  out.d = dimensions[1] * c + dimensions[0] * n;
+  out.h = s.y + 2;
+  out.enabled = enabled && (!["plane", "heli"].includes(s.type) || s.y < 3);
+  return out;
+}
 export function simulate(s, input, dt, env = {}) {
   dt = clamp(dt, 0, 0.05);
   const spec = SPECS[s.type],
@@ -211,6 +236,23 @@ export function simulate(s, input, dt, env = {}) {
     climb = clamp(input.climb || 0, -1, 1);
   const ground = isLand(s.x, s.z),
     flying = kind === "plane" || kind === "heli";
+  const vectorWalk = kind === "foot" && Number.isFinite(input.cameraHeading);
+  let walkHeading = s.travelHeading ?? s.heading,
+    walkAmount = 0;
+  if (vectorWalk) {
+    const mx = clamp(input.moveX || 0, -1, 1),
+      mz = clamp(input.moveZ || 0, -1, 1),
+      yaw = input.cameraHeading;
+    walkAmount = Math.min(1, Math.hypot(mx, mz));
+    if (walkAmount > 0.001) {
+      walkHeading = Math.atan2(
+        Math.sin(yaw) * mz - Math.cos(yaw) * mx,
+        Math.cos(yaw) * mz + Math.sin(yaw) * mx,
+      );
+      s.heading +=
+        wrapAngle(walkHeading - s.heading) * (1 - Math.exp(-14 * dt));
+    }
+  }
   const wheeled = kind === "car" || kind === "bike",
     onRoad = isRoad(s.x, s.z),
     previousSpeed = s.speed;
@@ -218,7 +260,12 @@ export function simulate(s, input, dt, env = {}) {
   s.steering = approach(s.steering ?? 0, steer, wheeled ? 7 : 10, dt);
   if (kind === "foot") {
     const max = ground ? (input.boost ? 11 : 6) : 3;
-    s.speed = approach(s.speed, throttle * max, 10, dt);
+    s.speed = approach(
+      s.speed,
+      (vectorWalk ? walkAmount : throttle) * max,
+      10,
+      dt,
+    );
   } else {
     let force = throttle * spec.accel;
     if (throttle < 0 && s.speed > 1)
@@ -250,15 +297,16 @@ export function simulate(s, input, dt, env = {}) {
     kind === "foot" || kind === "heli"
       ? 1
       : Math.min(Math.abs(s.speed) / 7, 1) * (s.speed < 0 ? -1 : 1);
-  s.heading -=
-    s.steering *
-    spec.turn *
-    turnFactor *
-    dt *
-    (kind === "car"
-      ? (1 - 0.55 * Math.min(Math.abs(s.speed) / spec.max, 1)) *
-        (input.brake ? 1.45 : 1)
-      : 1);
+  if (!vectorWalk)
+    s.heading -=
+      s.steering *
+      spec.turn *
+      turnFactor *
+      dt *
+      (kind === "car"
+        ? (1 - 0.55 * Math.min(Math.abs(s.speed) / spec.max, 1)) *
+          (input.brake ? 1.45 : 1)
+        : 1);
   s.acceleration = dt > 0 ? (s.speed - previousSpeed) / dt : 0;
   if (wheeled) {
     const grip = input.brake && Math.abs(s.speed) > 7 ? 1.5 : onRoad ? 9 : 4;
@@ -276,7 +324,7 @@ export function simulate(s, input, dt, env = {}) {
       dt,
     );
   } else {
-    s.travelHeading = s.heading;
+    s.travelHeading = vectorWalk ? walkHeading : s.heading;
     s.drift = 0;
   }
   if (kind === "plane") {
@@ -306,7 +354,27 @@ export function simulate(s, input, dt, env = {}) {
     if (!ground && s.y < 1.5) s.hit = true;
     s.pitch = approach(s.pitch, throttle * 0.13, 3, dt);
   } else if (kind === "boat") s.y = -0.45;
-  else if (kind === "foot") s.y = ground ? 0.25 : -0.85;
+  else if (kind === "foot") {
+    const floor = ground ? FOOT_GROUND : FOOT_SWIM;
+    if (!ground) {
+      s.y = floor;
+      s.vertical = 0;
+      s.grounded = true;
+    } else {
+      s.grounded = s.y <= floor + 0.01;
+      if (input.jump && !s.jumpHeld && s.grounded) {
+        s.vertical = 7.2;
+        s.grounded = false;
+      }
+      s.vertical -= 18 * dt;
+      s.y = Math.max(floor, s.y + s.vertical * dt);
+      if (s.y <= floor) {
+        s.vertical = 0;
+        s.grounded = true;
+      }
+    }
+    s.jumpHeld = !!input.jump;
+  }
   s.roll = approach(
     s.roll,
     -steer *
@@ -331,8 +399,11 @@ export function simulate(s, input, dt, env = {}) {
     s.hit = true;
   } else if (blocked(nx, nz, s.y, spec.radius, env.colliders)) {
     if (kind === "foot") {
+      const oldX = s.x,
+        oldZ = s.z;
       if (!blocked(nx, s.z, s.y, spec.radius, env.colliders)) s.x = nx;
       if (!blocked(s.x, nz, s.y, spec.radius, env.colliders)) s.z = nz;
+      if (Math.hypot(s.x - oldX, s.z - oldZ) < 0.00001) s.speed = 0;
     } else {
       s.speed *= -0.22;
       s.hit = true;
@@ -348,7 +419,8 @@ export function simulate(s, input, dt, env = {}) {
       s.y = approach(s.y, -1.5, 2, dt);
     }
   }
-  s.distance += Math.hypot(dx, dz);
+  // Count only movement actually accepted by collision handling.
+  s.distance += Math.hypot(s.x - (nx - dx), s.z - (nz - dz));
   return {
     recover:
       s.waterTime > 1.2 ||

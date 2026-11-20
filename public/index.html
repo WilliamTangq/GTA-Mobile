@@ -68,10 +68,14 @@
         <p class="intro-desc">
           开上公路，飞越城市，驶向大海。<br />没有任务，没有倒计时。想去哪，就去哪。
         </p>
-        <button id="start-btn" class="primary-button" disabled>
-          <span id="start-label">正在准备海岛…</span
-          ><span class="button-icon">▶</span>
-        </button>
+        <div class="start-actions">
+          <button id="start-btn" class="primary-button" disabled>
+            <span id="start-label">正在准备海岛…</span
+            ><span class="button-icon">▶</span></button
+          ><button id="new-session-btn" class="new-session" hidden>
+            重新开始
+          </button>
+        </div>
         <div class="intro-meta">
           <span>9 种载具</span><i></i><span>陆 · 海 · 空</span><i></i
           ><span>触控 / 键盘</span>
@@ -82,7 +86,7 @@
         <div>SUNDOWN COAST<small>一场说走就走的日落兜风</small></div>
       </div>
       <div class="intro-bottom">
-        <span>WILLIAM’S PLAYGROUND / VOL. 02</span
+        <span>WILLIAM’S PLAYGROUND / VOL. 03</span
         ><span
           >建议横屏游玩 <svg><use href="#i-rotate" /></svg
         ></span>
@@ -150,7 +154,7 @@
           <div class="stick-cross"></div>
           <div id="stick-knob"><span></span></div>
         </div>
-        <span class="control-caption">方向 / 移动</span>
+        <span class="control-caption" id="control-caption">转向</span>
       </div>
       <div class="touch-right">
         <div class="flight-controls">
@@ -162,9 +166,10 @@
         </div>
         <div class="pedals">
           <button class="brake-pedal" data-hold="brake">
-            <svg><use href="#i-brake" /></svg><span>刹车 / 倒退</span></button
+            <svg><use href="#i-brake" /></svg
+            ><span id="brake-label">刹车 / 倒退</span></button
           ><button class="gas-pedal" data-hold="gas">
-            <svg><use href="#i-pedal" /></svg><span>加速</span>
+            <svg><use href="#i-pedal" /></svg><span id="gas-label">加速</span>
           </button>
         </div>
       </div>
@@ -179,6 +184,15 @@
         aria-label="手刹漂移"
       >
         手刹 <kbd>SPACE</kbd>
+      </button>
+      <button
+        id="jump-btn"
+        class="drift-button"
+        data-hold="jump"
+        aria-label="跳跃"
+        hidden
+      >
+        跳跃 <kbd>SPACE</kbd>
       </button>
       <div class="portrait-hint">
         <svg><use href="#i-rotate" /></svg> 横屏视野更开阔
@@ -250,10 +264,15 @@
         <button id="resume-btn" class="primary-button">
           继续探索 <span>▶</span>
         </button>
+        <div class="session-status">
+          <span id="save-status" role="status">每5秒自动保存到此设备</span
+          ><span id="performance-status"></span>
+        </div>
         <div class="setting-row">
           <span>画面质量</span
           ><select id="quality" aria-label="画面质量">
-            <option value="low">流畅 · 推荐手机</option>
+            <option value="auto">自动 · 推荐手机</option>
+            <option value="low">流畅 · 固定画质</option>
             <option value="high">清晰 · 推荐电脑</option>
           </select>
         </div>
@@ -277,14 +296,12 @@
           <svg><use href="#i-expand" /></svg> 全屏游玩
         </button>
         <div class="pause-help">
-          手机：左侧摇杆控制方向，右侧按钮加速或刹车。飞机、直升机可使用升降按钮。<br /><br />电脑：WASD
+          手机：驾驶时左摇杆只转向，右侧油门和刹车控制速度。步行时摇杆控制移动，跳跃按钮起跳。拖动画面转动镜头，双指开合缩放。飞机、直升机使用升降按钮。<br /><br />电脑：WASD
           驾驶 · Q/Z 升降 · E 上下车 · V 换载具 · M 地图 · C 镜头 · R 复位 ·
-          Shift 加速 · Space 手刹<br /><br />iPhone 可在 Safari
+          Shift 加速 / 奔跑 · Space 手刹 / 跳跃<br /><br />iPhone 可在 Safari
           分享菜单中选择「添加到主屏幕」。
         </div>
-        <small class="version"
-          >ISLAND DRIVE 1.1 / LIVING ISLAND · YUKA + KENNEY</small
-        >
+        <small class="version">ISLAND DRIVE 1.2 / FREE TO EXPLORE</small>
       </section>
     </div>
     <div id="fatal" class="modal" hidden>

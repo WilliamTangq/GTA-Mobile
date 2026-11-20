@@ -142,6 +142,7 @@ export function createTrafficSimulation() {
     actors.push(a);
     manager.add(a.agent);
   }
+  const cars = actors.filter((a) => a.kind === "car");
   const simulation = {
     actors,
     time: 0,
@@ -163,21 +164,25 @@ export function createTrafficSimulation() {
       for (const a of actors) {
         if (!a.enabled || a.kind !== "car") continue;
         const p = a.agent.position,
-          speed = a.agent.velocity.length(),
           fx = Math.sin(a.heading),
           fz = Math.cos(a.heading);
         let limit = a.baseSpeed;
-        const targets = actors
-          .filter((b) => b.enabled && b.kind === "car" && b !== a)
-          .map((b) => ({
-            x: b.agent.position.x,
-            z: b.agent.position.z,
-            y: 0.7,
-          }));
-        if (player && player.y < 3) targets.push(player);
-        for (const b of targets) {
-          const dx = b.x - p.x,
-            dz = b.z - p.z,
+        for (const b of cars) {
+          if (!b.enabled || b === a) continue;
+          const q = b.agent.position,
+            dx = q.x - p.x,
+            dz = q.z - p.z,
+            ahead = dx * fx + dz * fz,
+            side = Math.abs(dx * fz - dz * fx);
+          if (ahead > 0 && ahead < 21 && side < 2.8)
+            limit = Math.min(
+              limit,
+              a.baseSpeed * clamp((ahead - 5) / 15, 0, 1),
+            );
+        }
+        if (player && player.y < 3) {
+          const dx = player.x - p.x,
+            dz = player.z - p.z,
             ahead = dx * fx + dz * fz,
             side = Math.abs(dx * fz - dz * fx);
           if (ahead > 0 && ahead < 21 && side < 2.8)

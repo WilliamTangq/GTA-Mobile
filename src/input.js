@@ -1,18 +1,22 @@
-import { clamp } from "./physics.js";
-export function createInput(canvas, onAction) {
+import { composeControls, deadZone } from "./controls.js";
+export function createInput(canvas, onAction, getType = () => "sport") {
   const keys = new Set(),
-    holds = new Set();
+    holds = new Set(),
+    holdPointers = new Map(),
+    cameraPointers = new Map();
+  let pinchDistance = null;
   let stick = { x: 0, y: 0 },
-    stickId = null,
-    drag = null;
+    stickId = null;
   const pad = document.querySelector("#stick"),
     knob = document.querySelector("#stick-knob");
   const reset = () => {
     keys.clear();
     holds.clear();
+    for (const pointers of holdPointers.values()) pointers.clear();
+    cameraPointers.clear();
+    pinchDistance = null;
     stick = { x: 0, y: 0 };
     stickId = null;
-    drag = null;
     knob.style.transform = "translate(0px,0px)";
     document
       .querySelectorAll(".held")
@@ -32,7 +36,10 @@ export function createInput(canvas, onAction) {
     KeyP: "pause",
   };
   window.addEventListener("keydown", (e) => {
-    if (e.target.matches("input,select,textarea")) return;
+    if (e.target.matches("input,select,textarea")) {
+      if (e.code === "Escape" && !e.repeat) onAction("pause");
+      return;
+    }
     if (
       ["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
         e.code,
@@ -54,7 +61,7 @@ export function createInput(canvas, onAction) {
       x /= len;
       y /= len;
     }
-    stick = { x, y };
+    stick = deadZone(x, y);
     knob.style.transform = `translate(${x * radius}px,${y * radius}px)`;
   }
   pad.addEventListener("pointerdown", (e) => {
@@ -75,6 +82,7 @@ export function createInput(canvas, onAction) {
     });
   for (const btn of document.querySelectorAll("[data-hold]")) {
     const pointers = new Set();
+    holdPointers.set(btn, pointers);
     btn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       pointers.add(e.pointerId);
@@ -92,22 +100,39 @@ export function createInput(canvas, onAction) {
       });
   }
   canvas.addEventListener("pointerdown", (e) => {
-    drag = { id: e.pointerId, x: e.clientX };
+    e.preventDefault();
+    cameraPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener("pointermove", (e) => {
-    if (drag?.id === e.pointerId) {
-      onAction("orbit", (e.clientX - drag.x) * 0.007);
-      drag.x = e.clientX;
+    if (cameraPointers.size === 2) {
+      const [a, b] = [...cameraPointers.values()];
+      pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
     }
   });
-  canvas.addEventListener("pointerup", () => (drag = null));
-  canvas.addEventListener("pointercancel", () => (drag = null));
+  canvas.addEventListener("pointermove", (e) => {
+    const previous = cameraPointers.get(e.pointerId);
+    if (!previous) return;
+    cameraPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (cameraPointers.size > 1) {
+      const [a, b] = [...cameraPointers.values()],
+        distance = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDistance > 10 && distance > 10)
+        onAction("zoom", -Math.log(distance / pinchDistance) * 2);
+      pinchDistance = distance;
+    } else {
+      onAction("orbit", (e.clientX - previous.x) * 0.007);
+      onAction("look-pitch", (e.clientY - previous.y) * 0.005);
+    }
+  });
+  for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
+    canvas.addEventListener(event, (e) => {
+      cameraPointers.delete(e.pointerId);
+      pinchDistance = null;
+    });
   canvas.addEventListener(
     "wheel",
     (e) => {
       e.preventDefault();
-      onAction("zoom", e.deltaY * 0.02);
+      onAction("zoom", e.deltaY * 0.002);
     },
     { passive: false },
   );
@@ -115,32 +140,7 @@ export function createInput(canvas, onAction) {
   return {
     reset,
     read() {
-      return {
-        steer: clamp(
-          stick.x +
-            (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) -
-            (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0),
-          -1,
-          1,
-        ),
-        throttle: clamp(
-          -stick.y +
-            (holds.has("gas") || keys.has("KeyW") || keys.has("ArrowUp")
-              ? 1
-              : 0) -
-            (holds.has("brake") || keys.has("KeyS") || keys.has("ArrowDown")
-              ? 1
-              : 0),
-          -1,
-          1,
-        ),
-        climb:
-          (holds.has("rise") || keys.has("KeyQ") ? 1 : 0) -
-          (holds.has("sink") || keys.has("KeyZ") ? 1 : 0),
-        boost:
-          holds.has("boost") || keys.has("ShiftLeft") || keys.has("ShiftRight"),
-        brake: keys.has("Space") || holds.has("handbrake"),
-      };
+      return composeControls(stick, keys, holds, getType());
     },
   };
 }

@@ -2,7 +2,8 @@ import * as T from "../vendor/three.module.js";
 import { isRoad } from "./physics.js";
 export function createEffects(scene) {
   const dummy = new T.Object3D(),
-    color = new T.Color();
+    color = new T.Color(),
+    roadColor = new T.Color(0x3d4b51);
   const tracks = new T.InstancedMesh(
     new T.PlaneGeometry(1, 1),
     new T.MeshBasicMaterial({
@@ -34,18 +35,22 @@ export function createEffects(scene) {
     24,
   );
   const buffers = [
-    { mesh: tracks, items: Array(100).fill(null), cursor: 0 },
-    { mesh: foam, items: Array(64).fill(null), cursor: 0 },
-    { mesh: smoke, items: Array(24).fill(null), cursor: 0 },
+    { mesh: tracks, items: Array(100).fill(null), cursor: 0, live: 0 },
+    { mesh: foam, items: Array(64).fill(null), cursor: 0, live: 0 },
+    { mesh: smoke, items: Array(24).fill(null), cursor: 0, live: 0 },
   ];
   for (const b of buffers) {
     b.mesh.userData.dynamic = true;
     b.mesh.frustumCulled = false;
+    b.mesh.visible = false;
     scene.add(b.mesh);
   }
   let timer = 0;
   function put(buffer, item) {
+    if (!buffer.items[buffer.cursor] || buffer.items[buffer.cursor].life <= 0)
+      buffer.live++;
     buffer.items[buffer.cursor] = item;
+    buffer.mesh.visible = true;
     buffer.cursor = (buffer.cursor + 1) % buffer.items.length;
   }
   return {
@@ -103,20 +108,27 @@ export function createEffects(scene) {
               length: Math.min(4, speed * 0.18),
             });
       }
-      for (const [bi, b] of buffers.entries())
+      for (const [bi, b] of buffers.entries()) {
+        if (b.live === 0) {
+          b.mesh.visible = false;
+          continue;
+        }
         for (let i = 0; i < b.items.length; i++) {
           const p = b.items[i];
+          if (p && p.life > 0 && running) {
+            p.life = Math.max(0, p.life - dt);
+            if (p.life === 0) b.live--;
+          }
           if (!p || p.life <= 0) {
             dummy.position.set(0, -100, 0);
             dummy.scale.setScalar(0);
           } else {
-            if (running) p.life -= dt;
             const age = 1 - p.life / p.max;
             dummy.position.set(p.x, p.y + (bi === 2 ? age * 1.8 : 0), p.z);
             dummy.rotation.set(-Math.PI / 2, p.heading, 0, "YXZ");
             if (bi === 0) {
               dummy.scale.set(0.21, p.length, 1);
-              color.set(0x1a3039).lerp(new T.Color(0x3d4b51), age);
+              color.set(0x1a3039).lerp(roadColor, age);
               tracks.setColorAt(i, color);
             } else if (bi === 1)
               dummy.scale.set(0.4 + age * 1.8, p.length * (1 - age * 0.7), 1);
@@ -128,7 +140,9 @@ export function createEffects(scene) {
           dummy.updateMatrix();
           b.mesh.setMatrixAt(i, dummy.matrix);
         }
-      for (const b of buffers) b.mesh.instanceMatrix.needsUpdate = true;
+        b.mesh.visible = b.live > 0;
+        b.mesh.instanceMatrix.needsUpdate = true;
+      }
       if (tracks.instanceColor) tracks.instanceColor.needsUpdate = true;
     },
   };

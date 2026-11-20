@@ -1680,3 +1680,50 @@ body:not(.wheeled) .drift-button {
     bottom: 183px;
   }
 }
+/* Mobile handling and local continuation */
+.start-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.new-session {
+  font-size: 12px;
+  background: transparent;
+  border-bottom: 1px solid #c9d5ba66;
+  padding: 8px 0;
+  color: #dae1cc;
+  white-space: nowrap;
+}
+.session-status {
+  font-size: 10px;
+  color: #b2c8bc;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 7px;
+  line-height: 1.6;
+  margin: -15px 0 20px;
+}
+.walk-key {
+  display: none !important;
+}
+body.walking .walk-key {
+  display: flex !important;
+}
+#jump-btn {
+  display: flex;
+}
+@media (orientation: portrait) and (max-width: 650px) {
+  .start-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  .new-session {
+    font-size: 11px;
+    padding: 6px 0;
+  }
+  .intro-content:has(.new-session:not([hidden])) {
+    top: 44%;
+  }
+}
